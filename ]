@@ -1,0 +1,47 @@
+
+#include <stdio.h>
+#include <stdbool.h>
+
+#define MAX_CHESS_PIECE 64
+
+typedef enum Player {
+  BLACK,
+  WHITE
+} Player;
+
+typedef struct Piece {
+  char x;
+  char y;
+  Player piece_owner;
+  unsigned char piece_symbol;
+} Piece;
+
+typedef struct Board {
+  Player current_player; 
+  bool king_in_check;
+  Piece (*pieces)[MAX_CHESS_PIECE];
+  unsigned char current_piece_total;
+} Board;
+
+Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char initial_size) {
+  Board board = {
+    .current_player = WHITE,
+    .king_in_check = false,
+    .pieces = initial_chess_pieces,
+    .current_piece_total = initial_size
+  };
+
+  return board;
+}
+
+int main() {
+  Piece pieces[MAX_CHESS_PIECE];
+
+  for (int i = 0; i < 8; i++) {
+
+  }
+
+  unsigned char init_size = 0;
+
+  Board board = InitBoard(&pieces, init_size);
+}
