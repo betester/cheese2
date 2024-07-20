@@ -18,18 +18,28 @@ typedef enum Player {
   WHITE
 } Player;
 
+typedef struct PieceMovement {
+  unsigned char max_diff;
+  unsigned char total_movement;
+  unsigned char movements[8][2];
+} PieceMovement;
+
 typedef struct Piece {
-  char x;
-  char y;
+  unsigned char x;
+  unsigned char y;
   Player piece_owner;
   PieceType piece_type;
+  bool has_moved; // change this into an actual movement taken
+  bool taken;
 } Piece;
 
 typedef struct Board {
   Player current_player; 
   bool king_in_check;
-  Piece (*pieces)[MAX_CHESS_PIECE];
+  bool checkmated;
   unsigned char current_piece_total;
+  PieceMovement (*movements)[6];
+  Piece (*pieces)[MAX_CHESS_PIECE];
 } Board;
 
 void AddPiece(Board *board, Piece new_piece) {
@@ -41,15 +51,53 @@ void AddPiece(Board *board, Piece new_piece) {
   board->current_piece_total++;
 }
 
-Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char initial_size) {
+Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char initial_size, PieceMovement (*movements)[6]) {
+
+  PieceMovement pawn_movement = {
+    .max_diff = 2, 
+    .total_movement = 1,
+    .movements = {{1, 0}}
+  };
+  PieceMovement king_movement = {
+    .max_diff = 1,
+    .total_movement = 8,
+    .movements = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, 1}, {1, 1}, {-1, -1}, {1, -1}}
+  };
+  PieceMovement queen_movement = {
+    .max_diff = 8, 
+    .total_movement = 8,
+    .movements = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, 1}, {1, 1}, {-1, -1}, {1, -1}}
+  };
+  PieceMovement bishop_movement = {
+    .max_diff = 8, 
+    .total_movement = 4,
+    .movements = {{-1, 1}, {1, 1}, {-1, -1}, {1, -1}}
+  };
+  PieceMovement rook_movement = {
+    .max_diff = 8, 
+    .total_movement = 4,
+    .movements = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}}
+  };
+  PieceMovement knight_movement = {
+    .max_diff = 1, 
+    .total_movement = 8,
+    .movements = {{-2,-1}, {-2, 1}, {2, -1}, {2,1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}}
+  };
+
+  (*movements)[PAWN] = pawn_movement;
+  (*movements)[KING] = king_movement;
+  (*movements)[QUEEN] = queen_movement;
+  (*movements)[BISHOP] = bishop_movement;
+  (*movements)[ROOK] = bishop_movement;
+  (*movements)[KNIGHT] = knight_movement;
 
   Board board = {
     .current_player = WHITE,
     .king_in_check = false,
     .pieces = initial_chess_pieces,
-    .current_piece_total = initial_size
+    .current_piece_total = initial_size,
+    .movements = movements
   };
-
 
   // add pawns
   for (int i=0; i < 8; i++) {
@@ -99,21 +147,152 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char in
   return board;
 }
 
-bool PositionOutOfBound(int x, int y){
+Piece *GetPiece(Board *board, int x, int y) {
+  for (int i=0; i < board->current_piece_total; i++) {
+    if ((*board->pieces[i]).x == x && (*board->pieces[i]).y == y && !(*board->pieces[i]).taken) {
+      return &(*board->pieces[i]);
+    }
+  }
+  return NULL;
+}
+
+bool PositionOutOfBound(int x, int y) {
   return x < 0 || x >= MAX_CHESS_PIECE || y < 0 || y >= MAX_CHESS_PIECE;
 }
 
+unsigned char* GetDirection(int x1, int y1, int x2, int y2) {
+  // TODO: somehow get the normalized direction from 2 points
+  // probably just the diff?
+  static unsigned char base_direction[2];
+
+  base_direction[0] = x2 - x1;
+  base_direction[1] = y2 - y1;
+
+  return base_direction;
+}
+
+bool BlockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, int dx, int dy, int tx, int ty) {
+
+  // check if pawn can go to the direction if there is no other pawn blocking the way
+  // except the target not so efficient because we checked every possible direction
+  // TODO: calculate the direction and see whether that direction is possible to be accessed
+
+  for (int i = 1; i <= max_offset; i++) {
+    int x_offset = st_x + dx * st_x;
+    int y_offset = st_y + dy * st_y;
+
+    if (x_offset == tx && y_offset == ty) {
+      continue;
+    }
+
+    Piece *piece = GetPiece(board, x_offset, y_offset);
+    if (piece != NULL){
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
+
+  if (board->king_in_check) {
+    return;
+  }
+
   if (PositionOutOfBound(sp_x, sp_y) || PositionOutOfBound(t_x, t_y)) {
     return;
   }
+
+  Piece *sp_piece = GetPiece(board, sp_x, sp_y);
+  Piece *t_piece = GetPiece(board, t_x, t_y);
+
+  // moving non existent piece should return null
+  if (sp_piece == NULL) {
+    return;
+  }
+
+  // cannot move piece if it's not the ownership of the player
+  if (sp_piece->piece_owner != board->current_player) {
+    return;
+  }
+
+  if (t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner) {
+    return;
+  }
+
+  PieceMovement (*movements)[6] = board->movements;
+
+  if (sp_piece->piece_type == PAWN) {
+    // could either move it 2 steps or 1 step depending whether it has already taken step previously
+    // en passant
+    // 2 or 1 step ahead on initial start
+    int x_diff = t_x - sp_x;
+    int y_dif = t_y - sp_y;
+
+    PieceMovement pawn_movement = (*movements)[PAWN];
+    int direction = sp_piece->piece_owner == WHITE ? -1 : 1;
+
+    unsigned char *base_direction = GetDirection(sp_x, sp_y, t_x, t_y);
+    unsigned char max_diff;
+
+    bool valid_direction = false;
+
+    // check if direction is valid
+    for (int i = 0; i < pawn_movement.total_movement; i++) {
+      int dx = direction * pawn_movement.movements[i][0];
+      int dy = pawn_movement.movements[i][1];
+
+      if (base_direction[0] == dx && base_direction[1] == dy) {
+        valid_direction = true;
+        max_diff = pawn_movement.max_diff;
+        break;
+      }
+    }
+
+    if (!valid_direction) {
+      return;
+    }
+
+    bool blocked = BlockedByNonTargetPiece(
+      board, 
+      max_diff, 
+      sp_x, 
+      sp_y,
+      base_direction[0], 
+      base_direction[1],
+      t_x,
+      t_y
+    );
+
+    if (blocked) {
+      return;
+    }
+
+    // if 2 step but already move then we cant take this step
+    if (base_direction[0] == 2 && sp_piece->has_moved) {
+      return;
+    }
+
+    // eat the piece
+    if (t_piece != NULL && !t_piece->taken) {
+      t_piece->taken = true;
+      sp_piece->x = t_x;
+      sp_piece->y = t_y;
+      sp_piece->has_moved = true;
+    } 
+
+  }
+  return;
 } 
 
 int main() {
+
   Piece pieces[MAX_CHESS_PIECE];
+  PieceMovement movements[6];
 
   unsigned char init_size = 0;
-  Board board = InitBoard(&pieces, init_size);
+  Board board = InitBoard(&pieces, init_size, &movements);
 
   while (true) {
 
