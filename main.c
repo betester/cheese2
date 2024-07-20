@@ -1,10 +1,12 @@
 
 #include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 
 #define MAX_CHESS_PIECE 64
 
 typedef enum PieceType {
+  NEUTRAL,
   PAWN,
   KING,
   QUEEN,
@@ -29,8 +31,8 @@ typedef struct Piece {
   unsigned char y;
   Player piece_owner;
   PieceType piece_type;
-  bool has_moved; // change this into an actual movement taken
   bool taken;
+  char last_movement[2];
 } Piece;
 
 typedef struct Board {
@@ -51,12 +53,16 @@ void AddPiece(Board *board, Piece new_piece) {
   board->current_piece_total++;
 }
 
-Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char initial_size, PieceMovement (*movements)[6]) {
+unsigned char PieceId(Player player, PieceType type) {
+  return (player << 3) | type;
+}
+
+Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[6]) {
 
   PieceMovement pawn_movement = {
     .max_diff = 2, 
-    .total_movement = 1,
-    .movements = {{1, 0}}
+    .total_movement = 3,
+    .movements = {{1, 0}, {1, -1}, {1, 1}}
   };
   PieceMovement king_movement = {
     .max_diff = 1,
@@ -95,53 +101,143 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], unsigned char in
     .current_player = WHITE,
     .king_in_check = false,
     .pieces = initial_chess_pieces,
-    .current_piece_total = initial_size,
+    .current_piece_total = 0,
     .movements = movements
   };
 
   // add pawns
-  for (int i=0; i < 8; i++) {
-    Piece black_piece = {6, i, BLACK, PAWN}; 
-    Piece white_piece = {1, i, BLACK, PAWN}; 
+  for (unsigned char i=0; i < 8; i++) {
+    Piece black_piece = {
+      .x = 6,
+      .y = i,
+      .piece_owner = BLACK,
+      .piece_type = PAWN
+    }; 
+    Piece white_piece = {
+      .x = 1,
+      .y = i,
+      .piece_owner = WHITE,
+      .piece_type = PAWN
+    }; 
 
     AddPiece(&board, black_piece);
     AddPiece(&board, white_piece);
   }
 
   // complete the black pieces
-  Piece black_king = {7, 4, BLACK, KING};
+  Piece black_king = {
+    .x = 7,
+    .y = 4,
+    .piece_owner = BLACK,
+    .piece_type = KING
+  };
   AddPiece(&board, black_king);
-  Piece black_queen = {7, 3, BLACK, QUEEN};
+  Piece black_queen = {
+    .x = 7,
+    .y = 3, 
+    .piece_owner = BLACK, 
+    .piece_type = QUEEN
+  };
   AddPiece(&board, black_queen);
-  Piece black_bishop_left = {7, 2, BLACK, BISHOP};
+  Piece black_bishop_left = {
+    .x = 7,
+    .y = 2,
+    .piece_owner = BLACK,
+    .piece_type = BISHOP
+  };
   AddPiece(&board, black_bishop_left);
-  Piece black_knight_left = {7, 1, BLACK, KNIGHT};
+  Piece black_knight_left = {
+    .x = 7,
+    .y = 1,
+    .piece_owner = BLACK,
+    .piece_type = KNIGHT
+  };
   AddPiece(&board, black_knight_left);
-  Piece black_rook_left = {7, 0, BLACK, ROOK};
-  AddPiece(&board, black_knight_left);
-  Piece black_bishop_right = {7, 5, BLACK, BISHOP};
+  Piece black_rook_left = {
+    .x = 7,
+    .y = 0,
+    .piece_owner = BLACK,
+    .piece_type = ROOK
+  };
+  AddPiece(&board, black_rook_left);
+  Piece black_bishop_right = {
+    .x = 7,
+    .y = 5,
+    .piece_owner = BLACK,
+    .piece_type = BISHOP
+  };
   AddPiece(&board, black_bishop_right);
-  Piece black_knight_right = {7, 6, BLACK, KNIGHT};
+  Piece black_knight_right = {
+    .x = 7,
+    .y = 6,
+    .piece_owner = BLACK,
+    .piece_type = KNIGHT
+  };
   AddPiece(&board, black_knight_right);
-  Piece black_rook_right = {7, 7, BLACK, ROOK};
+  Piece black_rook_right = {
+    .x = 7,
+    .y = 7,
+    .piece_owner = BLACK,
+    .piece_type = ROOK
+  };
   AddPiece(&board, black_rook_right);
 
   // complete the white pieces
-  Piece white_king = {0, 4, WHITE, KING};
+  Piece white_king = {
+    .x = 0,
+    .y = 4,
+    .piece_owner = WHITE,
+    .piece_type = KING
+  };
   AddPiece(&board, white_king);
-  Piece white_queen = {0, 3, WHITE, QUEEN};
+  Piece white_queen = {
+    .x = 0,
+    .y = 3,
+    .piece_owner = WHITE,
+    .piece_type = QUEEN
+  };
   AddPiece(&board, white_queen);
-  Piece white_bishop_left = {0, 2, WHITE, BISHOP};
+  Piece white_bishop_left = {
+    .x = 0,
+    .y = 2,
+    .piece_owner = WHITE,
+    .piece_type = BISHOP
+  };
   AddPiece(&board, white_bishop_left);
-  Piece white_knight_left = {0, 1, WHITE, KNIGHT};
+  Piece white_knight_left = {
+    .x = 0,
+    .y = 1,
+    .piece_owner = WHITE,
+    .piece_type = KNIGHT
+  };
   AddPiece(&board, white_knight_left);
-  Piece white_rook_left = {0, 0, WHITE, ROOK};
-  AddPiece(&board, white_knight_left);
-  Piece white_bishop_right = {0, 5, WHITE, BISHOP};
+  Piece white_rook_left = {
+    .x = 0,
+    .y = 0,
+    .piece_owner = WHITE,
+    .piece_type = ROOK
+  };
+  AddPiece(&board, white_rook_left);
+  Piece white_bishop_right = {
+    .x = 0,
+    .y = 5,
+    .piece_owner = WHITE,
+    .piece_type = BISHOP
+  };
   AddPiece(&board, white_bishop_right);
-  Piece white_knight_right = {0, 6, WHITE, KNIGHT};
+  Piece white_knight_right = {
+    .x = 0,
+    .y = 6,
+    .piece_owner = WHITE,
+    .piece_type = KNIGHT
+  };
   AddPiece(&board, white_knight_right);
-  Piece white_rook_right = {0, 7, WHITE, ROOK};
+  Piece white_rook_right = {
+    .x = 0,
+    .y = 7,
+    .piece_owner = WHITE,
+    .piece_type = ROOK
+  };
   AddPiece(&board, white_rook_right);
 
   return board;
@@ -175,7 +271,6 @@ bool BlockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
 
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
-  // TODO: calculate the direction and see whether that direction is possible to be accessed
 
   for (int i = 1; i <= max_offset; i++) {
     int x_offset = st_x + dx * st_x;
@@ -192,6 +287,35 @@ bool BlockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   }
 
   return false;
+}
+
+bool ValidDirection(PieceMovement *movement, unsigned char *base_direction, char x_dir, char y_dir) {
+  bool valid_direction = false;
+
+  // check if direction is valid
+  for (int i = 0; i < movement->total_movement; i++) {
+    int dx = x_dir * movement->movements[i][0];
+    int dy = y_dir * movement->movements[i][1];
+
+    if (base_direction[0] == dx && base_direction[1] == dy) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void AttackPiece(Piece *sp_piece, Piece *t_piece, int t_x, int t_y, int dx, int dy) {
+
+  // eat the piece
+  if (t_piece != NULL && !t_piece->taken) {
+    t_piece->taken = true;
+    sp_piece->x = t_x;
+    sp_piece->y = t_y;
+  } 
+
+  sp_piece->last_movement[0] = dx;
+  sp_piece->last_movement[1] = dy;
 }
 
 void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
@@ -223,78 +347,110 @@ void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   PieceMovement (*movements)[6] = board->movements;
 
+  int dx = t_x - sp_x;
+  int dy = t_y - sp_y;
+
+  PieceMovement pawn_movement = (*movements)[sp_piece->piece_type];
+  int x_direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE) ? -1 : 1;
+
+  unsigned char *base_direction = GetDirection(sp_x, sp_y, t_x, t_y);
+  unsigned char max_diff = pawn_movement.max_diff;
+
+  if (ValidDirection(&pawn_movement, base_direction, x_direction, 1)) {
+    return;
+  }
+
+  bool blocked = BlockedByNonTargetPiece(
+    board, 
+    max_diff, 
+    sp_x, 
+    sp_y,
+    base_direction[0], 
+    base_direction[1],
+    t_x,
+    t_y
+  );
+
+  if (blocked) {
+    return;
+  }
+
   if (sp_piece->piece_type == PAWN) {
     // could either move it 2 steps or 1 step depending whether it has already taken step previously
     // en passant
     // 2 or 1 step ahead on initial start
-    int x_diff = t_x - sp_x;
-    int y_dif = t_y - sp_y;
-
-    PieceMovement pawn_movement = (*movements)[PAWN];
-    int direction = sp_piece->piece_owner == WHITE ? -1 : 1;
-
-    unsigned char *base_direction = GetDirection(sp_x, sp_y, t_x, t_y);
-    unsigned char max_diff;
-
-    bool valid_direction = false;
-
-    // check if direction is valid
-    for (int i = 0; i < pawn_movement.total_movement; i++) {
-      int dx = direction * pawn_movement.movements[i][0];
-      int dy = pawn_movement.movements[i][1];
-
-      if (base_direction[0] == dx && base_direction[1] == dy) {
-        valid_direction = true;
-        max_diff = pawn_movement.max_diff;
-        break;
-      }
-    }
-
-    if (!valid_direction) {
-      return;
-    }
-
-    bool blocked = BlockedByNonTargetPiece(
-      board, 
-      max_diff, 
-      sp_x, 
-      sp_y,
-      base_direction[0], 
-      base_direction[1],
-      t_x,
-      t_y
-    );
-
-    if (blocked) {
-      return;
-    }
 
     // if 2 step but already move then we cant take this step
-    if (base_direction[0] == 2 && sp_piece->has_moved) {
+    if (base_direction[0] == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
       return;
     }
 
-    // eat the piece
-    if (t_piece != NULL && !t_piece->taken) {
-      t_piece->taken = true;
-      sp_piece->x = t_x;
-      sp_piece->y = t_y;
-      sp_piece->has_moved = true;
-    } 
-
+    AttackPiece(sp_piece, t_piece, t_x, t_y, dx, dy);
   }
+
   return;
-} 
+}
+
+void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
+  for (int i=0; i < board->current_piece_total; i++) {
+    unsigned char x = (*board->pieces)[i].x;
+    unsigned char y = (*board->pieces)[i].y;
+
+    (*board2d)[x][y] = PieceId((*board->pieces)[i].piece_owner, (*board->pieces)[i].piece_type);
+  }
+}
+
+void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]) {
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 8; j++) {
+      printf("%s ", (*piece_symbols)[(*board2d)[i][j]]);
+    }
+    printf("\n");
+  }
+}
+
+void InitPieceSymbols(char (*piece_symbols)[16][5]) {
+    strcpy((*piece_symbols)[PieceId(WHITE, PAWN)], "P");
+    strcpy((*piece_symbols)[PieceId(WHITE, KING)], "K");
+    strcpy((*piece_symbols)[PieceId(WHITE, QUEEN)], "Q");
+    strcpy((*piece_symbols)[PieceId(WHITE, KNIGHT)], "KN");
+    strcpy((*piece_symbols)[PieceId(WHITE, ROOK)], "R");
+    strcpy((*piece_symbols)[PieceId(WHITE, BISHOP)], "B");
+    
+    strcpy((*piece_symbols)[PieceId(BLACK, PAWN)], "p");
+    strcpy((*piece_symbols)[PieceId(BLACK, KING)], "k");
+    strcpy((*piece_symbols)[PieceId(BLACK, QUEEN)], "q");
+    strcpy((*piece_symbols)[PieceId(BLACK, KNIGHT)], "kn");
+    strcpy((*piece_symbols)[PieceId(BLACK, ROOK)], "r");
+    strcpy((*piece_symbols)[PieceId(BLACK, BISHOP)], "b");
+    
+    // Initialize NEUTRAL pieces if needed
+    strcpy((*piece_symbols)[PieceId(WHITE, NEUTRAL)], " ");
+    strcpy((*piece_symbols)[PieceId(BLACK, NEUTRAL)], " ");
+}
+
+void UserInput(Board *board) {
+  int sp_x, sp_y, t_x, t_y;
+  printf("Player %d to make the move", board->current_player);
+  scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
+  MovePiece(board, sp_x, sp_y, t_x, t_y);
+}
 
 int main() {
 
+  printf("Running Game\n");
+
   Piece pieces[MAX_CHESS_PIECE];
   PieceMovement movements[6];
+  unsigned char board2d[8][8];
+  char piece_symbols[16][5];
 
-  unsigned char init_size = 0;
-  Board board = InitBoard(&pieces, init_size, &movements);
-
+  Board board = InitBoard(&pieces,  &movements);
+  MapBoardTo2dBoard(&board, &board2d);
+  InitPieceSymbols(&piece_symbols);
+  
   while (true) {
-
+    DisplayBoard(&board2d, &piece_symbols);
+    UserInput(&board);
   }
 }
