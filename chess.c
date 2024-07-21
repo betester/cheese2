@@ -233,6 +233,7 @@ bool positionOutofBound(int x, int y) {
 
 bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, int dx, int dy, int tx, int ty) {
 
+  //TODO: inline this function only called once anyway
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
 
@@ -259,6 +260,8 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
 bool validDirection(PieceMovement *movement, unsigned char dx, unsigned char dy, char x_dir, char y_dir) {
   bool valid_direction = false;
 
+  //TODO: inline this function only called once anyway
+  
   // check if direction is valid
   for (int i = 0; i < movement->total_movement; i++) {
     int valid_dx = x_dir * movement->movements[i][0];
@@ -382,6 +385,76 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   
     // change the current allowed player to move
     board->current_player = (board -> current_player + 1) % 2;
+  }
+
+  // TODO: 
+  // 1. handle when the king is in check or not for the current player 
+  // just loop and find the king, once we find it we check for every enemy piece whether it attacks the king or not.
+  // 2. handle whether the king is on checkmate or not
+  // this needs to know whether the king is on check or not. but the idea is to see every possible direction the king can go
+  // then check whether it's possible to move to certain position if it's not attacked and not occupied. checkmate happens only if 
+  // the king is on check with nowhere to go.
+
+  // finding the king position
+  Piece *opponent_king;
+
+  for (int i = 0; i < board->current_piece_total; i++) {
+    if ((*board->pieces)[i].piece_owner == board->current_player && (*board->pieces)[i].piece_type == KING) {
+      opponent_king = &(*board->pieces)[i];
+      break;
+    }
+  }
+
+  unsigned char kx = opponent_king->x;
+  unsigned char ky = opponent_king->y;
+
+  unsigned char king_movements[8][2] = (*piece_movement)[KING];
+
+  int king_surrounding_loc[king_movements->total_movement][2] = {0};
+
+  for (int i = 0; i < king_movements->total_movement; i++) {
+    king_surrounding_loc[i][0] = kx + (*king_movements->movements)[i][0];
+    king_surrounding_loc[i][1] = ky + (*king_movements->movements)[i][1];
+  }
+
+  bool king_in_check = true;
+
+  for (int i = 0; i < board->current_piece_total;i++) {
+    Piece piece = board->pieces[i];
+
+    if (piece.piece_owner == board->current_player || piece.taken) {
+      continue;
+    }
+    PieceMovement piece_movement = (*movements)[piece.piece_type];
+
+    int dx_k = kx - piece.x;
+    int dy_k = ky - piece.y;
+
+    king_in_check = king_in_check || validDirection(&piece_movement, dx_k, dy_k, kx, ky);
+
+    unsigned char total_surrounded = 0;
+    unsigned char expected_surrounding_for_checkmate = king_movement->total_movement;
+
+    for (int j = 0; j < king_movements->total_movement; j++) {
+      if (positionOutofBound(king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
+        expected_surrounding_for_checkmate--;
+        continue;
+      }
+      int dx_ks = king_surrounding_loc[j][0] - piece.x;
+      int dy_ks = king_surrounding_loc[j][1] - piece.y;
+
+      if (validDirection(&piece_movemement, dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1]) {
+        total_surrounded++;
+      }
+    }
+
+    if (king_in_check) {
+      board->king_in_check = true;
+    }
+
+    if (king_in_check && total_surrounded == expected_surrounding_for_checkmate) {
+      board->checkmate = true;
+    }
   }
 
   return true;
