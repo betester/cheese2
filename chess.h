@@ -38,7 +38,7 @@ typedef struct Board {
   bool king_in_check;
   bool checkmated;
   unsigned char current_piece_total;
-  PieceMovement (*movements)[6];
+  PieceMovement (*movements)[TOTAL_PIECES];
   Piece (*pieces)[MAX_CHESS_PIECE];
 } Board;
 
@@ -50,5 +50,6 @@ void InitPieceSymbols(char (*piece_symbols)[16][5]);
 
 void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]);
 
-void UserInput(Board *board);
+void UserInput(Board *board, unsigned char (*taken_move)[4]);
 
+void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4]);

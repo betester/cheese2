@@ -262,7 +262,7 @@ bool validDirection(PieceMovement *movement, unsigned char *base_direction, char
   return false;
 }
 
-void AttackPiece(Piece *sp_piece, Piece *t_piece, int t_x, int t_y, int dx, int dy) {
+void attackPiece(Piece *sp_piece, Piece *t_piece, int t_x, int t_y, int dx, int dy) {
 
   // eat the piece
   if (t_piece != NULL && !t_piece->taken) {
@@ -275,14 +275,14 @@ void AttackPiece(Piece *sp_piece, Piece *t_piece, int t_x, int t_y, int dx, int 
   sp_piece->last_movement[1] = dy;
 }
 
-void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
+bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   if (board->king_in_check) {
-    return;
+    return false;
   }
 
   if (positionOutofBound(sp_x, sp_y) || positionOutofBound(t_x, t_y)) {
-    return;
+    return false;
   }
 
   Piece *sp_piece = getPiece(board, sp_x, sp_y);
@@ -290,16 +290,16 @@ void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   // moving non existent piece should return null
   if (sp_piece == NULL) {
-    return;
+    return false;
   }
 
   // cannot move piece if it's not the ownership of the player
   if (sp_piece->piece_owner != board->current_player) {
-    return;
+    return false;
   }
 
   if (t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner) {
-    return;
+    return false;
   }
 
   PieceMovement (*movements)[6] = board->movements;
@@ -314,7 +314,7 @@ void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   unsigned char max_diff = pawn_movement.max_diff;
 
   if (validDirection(&pawn_movement, base_direction, x_direction, 1)) {
-    return;
+    return false;
   }
 
   bool blocked = blockedByNonTargetPiece(
@@ -329,7 +329,7 @@ void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   );
 
   if (blocked) {
-    return;
+    return false;
   }
 
   if (sp_piece->piece_type == PAWN) {
@@ -339,13 +339,13 @@ void MovePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
     // if 2 step but already move then we cant take this step
     if (base_direction[0] == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
-      return;
+      return false;
     }
 
-    AttackPiece(sp_piece, t_piece, t_x, t_y, dx, dy);
+    attackPiece(sp_piece, t_piece, t_x, t_y, dx, dy);
   }
 
-  return;
+  return true;
 }
 
 void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
@@ -364,6 +364,23 @@ void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]) 
     }
     printf("\n");
   }
+}
+
+void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4]) {
+  int sp_x, sp_y, t_x, t_y;
+
+  if ((*taken_move)[0] == 0 && (*taken_move)[1] == 0 && (*taken_move)[2] == 0 && (*taken_move)[3] == 0) {
+    return;
+  }
+
+  sp_x = (*taken_move)[0];
+  sp_y = (*taken_move)[1];
+  t_x = (*taken_move)[2];
+  t_y = (*taken_move)[3];
+
+  unsigned char prev_id = (*board2d)[sp_x][sp_y];
+  (*board2d)[sp_x][sp_y] = (*board2d)[t_x][t_y];
+  (*board2d)[t_x][t_y] = prev_id;
 }
 
 void InitPieceSymbols(char (*piece_symbols)[16][5]) {
@@ -386,9 +403,21 @@ void InitPieceSymbols(char (*piece_symbols)[16][5]) {
     strcpy((*piece_symbols)[pieceId(BLACK, NEUTRAL)], " ");
 }
 
-void UserInput(Board *board) {
+void UserInput(Board *board, unsigned char (*taken_move)[4]) {
   int sp_x, sp_y, t_x, t_y;
-  printf("Player %d to make the move", board->current_player);
+  printf("Player %d to make the move\n", board->current_player);
   scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
-  MovePiece(board, sp_x, sp_y, t_x, t_y);
+  bool piece_moved = movePiece(board, sp_x, sp_y, t_x, t_y);
+
+  if (piece_moved) {
+    (*taken_move)[0] = sp_x;
+    (*taken_move)[1] = sp_y;
+    (*taken_move)[2] = t_x;
+    (*taken_move)[3] = t_y;
+  } else {
+    (*taken_move)[0] = 0;
+    (*taken_move)[1] = 0;
+    (*taken_move)[2] = 0;
+    (*taken_move)[3] = 0;
+  }
 }
