@@ -408,19 +408,19 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   unsigned char kx = opponent_king->x;
   unsigned char ky = opponent_king->y;
 
-  unsigned char king_movements[8][2] = (*piece_movement)[KING];
+  PieceMovement king_movements = (*movements)[KING];
 
-  int king_surrounding_loc[king_movements->total_movement][2] = {0};
+  int king_surrounding_loc[king_movements.total_movement][2];
 
-  for (int i = 0; i < king_movements->total_movement; i++) {
-    king_surrounding_loc[i][0] = kx + (*king_movements->movements)[i][0];
-    king_surrounding_loc[i][1] = ky + (*king_movements->movements)[i][1];
+  for (int i = 0; i < king_movements.total_movement; i++) {
+    king_surrounding_loc[i][0] = kx + king_movements.movements[i][0];
+    king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
   }
 
   bool king_in_check = true;
 
   for (int i = 0; i < board->current_piece_total;i++) {
-    Piece piece = board->pieces[i];
+    Piece piece = (*board->pieces)[i];
 
     if (piece.piece_owner == board->current_player || piece.taken) {
       continue;
@@ -433,9 +433,9 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     king_in_check = king_in_check || validDirection(&piece_movement, dx_k, dy_k, kx, ky);
 
     unsigned char total_surrounded = 0;
-    unsigned char expected_surrounding_for_checkmate = king_movement->total_movement;
+    unsigned char expected_surrounding_for_checkmate = king_movements.total_movement;
 
-    for (int j = 0; j < king_movements->total_movement; j++) {
+    for (int j = 0; j < king_movements.total_movement; j++) {
       if (positionOutofBound(king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
         expected_surrounding_for_checkmate--;
         continue;
@@ -443,7 +443,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       int dx_ks = king_surrounding_loc[j][0] - piece.x;
       int dy_ks = king_surrounding_loc[j][1] - piece.y;
 
-      if (validDirection(&piece_movemement, dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1]) {
+      if (validDirection(movements[piece.piece_type], dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
         total_surrounded++;
       }
     }
@@ -453,7 +453,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     }
 
     if (king_in_check && total_surrounded == expected_surrounding_for_checkmate) {
-      board->checkmate = true;
+      board->checkmated = true;
     }
   }
 
