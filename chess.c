@@ -68,13 +68,15 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
       .x = 6,
       .y = i,
       .piece_owner = BLACK,
-      .piece_type = PAWN
+      .piece_type = PAWN,
+      .taken = false
     }; 
     Piece white_piece = {
       .x = 1,
       .y = i,
       .piece_owner = WHITE,
-      .piece_type = PAWN
+      .piece_type = PAWN,
+      .taken = false
     }; 
 
     addPiece(&board, black_piece);
@@ -86,56 +88,64 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .x = 7,
     .y = 4,
     .piece_owner = BLACK,
-    .piece_type = KING
+    .piece_type = KING,
+    .taken = false
   };
   addPiece(&board, black_king);
   Piece black_queen = {
     .x = 7,
     .y = 3, 
     .piece_owner = BLACK, 
-    .piece_type = QUEEN
+    .piece_type = QUEEN,
+    .taken = false
   };
   addPiece(&board, black_queen);
   Piece black_bishop_left = {
     .x = 7,
     .y = 2,
     .piece_owner = BLACK,
-    .piece_type = BISHOP
+    .piece_type = BISHOP,
+    .taken = false
   };
   addPiece(&board, black_bishop_left);
   Piece black_knight_left = {
     .x = 7,
     .y = 1,
     .piece_owner = BLACK,
-    .piece_type = KNIGHT
+    .piece_type = KNIGHT,
+    .taken = false
   };
   addPiece(&board, black_knight_left);
   Piece black_rook_left = {
     .x = 7,
     .y = 0,
     .piece_owner = BLACK,
-    .piece_type = ROOK
+    .piece_type = ROOK,
+    .taken = false
   };
   addPiece(&board, black_rook_left);
   Piece black_bishop_right = {
     .x = 7,
     .y = 5,
     .piece_owner = BLACK,
-    .piece_type = BISHOP
+    .piece_type = BISHOP,
+    .taken = false
   };
   addPiece(&board, black_bishop_right);
   Piece black_knight_right = {
     .x = 7,
     .y = 6,
     .piece_owner = BLACK,
-    .piece_type = KNIGHT
+    .piece_type = KNIGHT,
+    .taken = false
   };
   addPiece(&board, black_knight_right);
   Piece black_rook_right = {
     .x = 7,
     .y = 7,
     .piece_owner = BLACK,
-    .piece_type = ROOK
+    .piece_type = ROOK,
+    .taken = false
   };
   addPiece(&board, black_rook_right);
 
@@ -144,56 +154,64 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .x = 0,
     .y = 4,
     .piece_owner = WHITE,
-    .piece_type = KING
+    .piece_type = KING,
+    .taken = false
   };
   addPiece(&board, white_king);
   Piece white_queen = {
     .x = 0,
     .y = 3,
     .piece_owner = WHITE,
-    .piece_type = QUEEN
+    .piece_type = QUEEN,
+    .taken = false
   };
   addPiece(&board, white_queen);
   Piece white_bishop_left = {
     .x = 0,
     .y = 2,
     .piece_owner = WHITE,
-    .piece_type = BISHOP
+    .piece_type = BISHOP,
+    .taken = false
   };
   addPiece(&board, white_bishop_left);
   Piece white_knight_left = {
     .x = 0,
     .y = 1,
     .piece_owner = WHITE,
-    .piece_type = KNIGHT
+    .piece_type = KNIGHT,
+    .taken = false
   };
   addPiece(&board, white_knight_left);
   Piece white_rook_left = {
     .x = 0,
     .y = 0,
     .piece_owner = WHITE,
-    .piece_type = ROOK
+    .piece_type = ROOK,
+    .taken = false
   };
   addPiece(&board, white_rook_left);
   Piece white_bishop_right = {
     .x = 0,
     .y = 5,
     .piece_owner = WHITE,
-    .piece_type = BISHOP
+    .piece_type = BISHOP,
+    .taken = false
   };
   addPiece(&board, white_bishop_right);
   Piece white_knight_right = {
     .x = 0,
     .y = 6,
     .piece_owner = WHITE,
-    .piece_type = KNIGHT
+    .piece_type = KNIGHT,
+    .taken = false
   };
   addPiece(&board, white_knight_right);
   Piece white_rook_right = {
     .x = 0,
     .y = 7,
     .piece_owner = WHITE,
-    .piece_type = ROOK
+    .piece_type = ROOK,
+    .taken = false
   };
   addPiece(&board, white_rook_right);
 
@@ -201,9 +219,9 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
 }
 
 Piece *getPiece(Board *board, int x, int y) {
-  for (int i=0; i < board->current_piece_total; i++) {
-    if ((*board->pieces[i]).x == x && (*board->pieces[i]).y == y && !(*board->pieces[i]).taken) {
-      return &(*board->pieces[i]);
+  for (int i = 0; i < board->current_piece_total; i++) {
+    if ((*board->pieces)[i].x == x && (*board->pieces)[i].y == y) {
+      return &(*board->pieces)[i];
     }
   }
   return NULL;
@@ -213,25 +231,17 @@ bool positionOutofBound(int x, int y) {
   return x < 0 || x >= MAX_CHESS_PIECE || y < 0 || y >= MAX_CHESS_PIECE;
 }
 
-unsigned char* getDirection(int x1, int y1, int x2, int y2) {
-  // TODO: somehow get the normalized direction from 2 points
-  // probably just the diff?
-  static unsigned char base_direction[2];
-
-  base_direction[0] = x2 - x1;
-  base_direction[1] = y2 - y1;
-
-  return base_direction;
-}
-
 bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, int dx, int dy, int tx, int ty) {
 
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
 
   for (int i = 1; i <= max_offset; i++) {
-    int x_offset = st_x + dx * st_x;
-    int y_offset = st_y + dy * st_y;
+    int x_offset = st_x + dx * i;
+    int y_offset = st_y + dy * i;
+
+    printf("x : %d\n", x_offset);
+    printf("y : %d\n", y_offset);
 
     if (x_offset == tx && y_offset == ty) {
       continue;
@@ -246,15 +256,15 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   return false;
 }
 
-bool validDirection(PieceMovement *movement, unsigned char *base_direction, char x_dir, char y_dir) {
+bool validDirection(PieceMovement *movement, unsigned char dx, unsigned char dy, char x_dir, char y_dir) {
   bool valid_direction = false;
 
   // check if direction is valid
   for (int i = 0; i < movement->total_movement; i++) {
-    int dx = x_dir * movement->movements[i][0];
-    int dy = y_dir * movement->movements[i][1];
+    int valid_dx = x_dir * movement->movements[i][0];
+    int valid_dy = y_dir * movement->movements[i][1];
 
-    if (base_direction[0] == dx && base_direction[1] == dy) {
+    if (valid_dx == dx && valid_dy == dy) {
       return true;
     }
   }
@@ -262,45 +272,44 @@ bool validDirection(PieceMovement *movement, unsigned char *base_direction, char
   return false;
 }
 
-void attackPiece(Piece *sp_piece, Piece *t_piece, int t_x, int t_y, int dx, int dy) {
-
-  // eat the piece
-  if (t_piece != NULL && !t_piece->taken) {
-    t_piece->taken = true;
-    sp_piece->x = t_x;
-    sp_piece->y = t_y;
-  } 
-
-  sp_piece->last_movement[0] = dx;
-  sp_piece->last_movement[1] = dy;
-}
-
 bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
+
+  printf("Checkpoint 0\n");
   if (board->king_in_check) {
+    printf("Cannot move piece as the king is in check\n");
     return false;
   }
 
   if (positionOutofBound(sp_x, sp_y) || positionOutofBound(t_x, t_y)) {
+    printf("Invalid position due to out of board bound\n");
     return false;
   }
 
+
+  printf("Checkpoint 1\n");
   Piece *sp_piece = getPiece(board, sp_x, sp_y);
+  printf("Checkpoint 2\n");
   Piece *t_piece = getPiece(board, t_x, t_y);
 
   // moving non existent piece should return null
   if (sp_piece == NULL) {
+    printf("Cannot move empty piece\n");
     return false;
   }
 
   // cannot move piece if it's not the ownership of the player
   if (sp_piece->piece_owner != board->current_player) {
+    printf("Cannot move opponent piece\n");
     return false;
   }
 
   if (t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner) {
+    printf("Cannot attack your own piece\n");
     return false;
   }
+
+  printf("Checkpoint 2\n");
 
   PieceMovement (*movements)[6] = board->movements;
 
@@ -308,12 +317,11 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   int dy = t_y - sp_y;
 
   PieceMovement pawn_movement = (*movements)[sp_piece->piece_type];
-  int x_direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE) ? -1 : 1;
+  int direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE) ? 1 : -1;
 
-  unsigned char *base_direction = getDirection(sp_x, sp_y, t_x, t_y);
   unsigned char max_diff = pawn_movement.max_diff;
 
-  if (validDirection(&pawn_movement, base_direction, x_direction, 1)) {
+  if (validDirection(&pawn_movement, dx, dy, direction, 1)) {
     return false;
   }
 
@@ -322,13 +330,14 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     max_diff, 
     sp_x, 
     sp_y,
-    base_direction[0], 
-    base_direction[1],
+    dx, 
+    dy,
     t_x,
     t_y
   );
 
   if (blocked) {
+    printf("Cannot move to target due to blocked by other piece\n");
     return false;
   }
 
@@ -338,11 +347,46 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // 2 or 1 step ahead on initial start
 
     // if 2 step but already move then we cant take this step
-    if (base_direction[0] == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
+    if (dx == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
       return false;
     }
 
-    attackPiece(sp_piece, t_piece, t_x, t_y, dx, dy);
+    // if diagonal steps are taken
+
+    printf("x : %d, y : %d\n", dx, dy * direction);
+    if (dx == 1 && (dy == 1 || dy == -1)) {
+
+      Piece *sp_beside_piece = getPiece(board, sp_x + dx, sp_y + dy);
+
+      if (t_piece != NULL) {
+        printf("Cannot do en passant if the target position is not empty%s\n");
+        return false;
+      }
+
+      if (sp_beside_piece == NULL) {
+        printf("Cannot do en passant no piece on the direction\n");
+        return false;
+      }
+
+      if (!(sp_beside_piece->last_movement[0] == 2 && sp_beside_piece->last_movement[1] == 0)) {
+        printf("Cannot do en passant if two steps are not taken\n");
+        return false;
+      }
+    }
+
+    // eat the piece
+    if (t_piece != NULL && !t_piece->taken) {
+      t_piece->taken = true;
+      sp_piece->x = t_x;
+      sp_piece->y = t_y;
+    } 
+
+    // update last taken movement
+    sp_piece->last_movement[0] = dx;
+    sp_piece->last_movement[1] = dy;
+  
+    // change the current allowed player to move
+    board->current_player = (board -> current_player + 1) % 2;
   }
 
   return true;
@@ -407,6 +451,7 @@ void UserInput(Board *board, unsigned char (*taken_move)[4]) {
   int sp_x, sp_y, t_x, t_y;
   printf("Player %d to make the move\n", board->current_player);
   scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
+
   bool piece_moved = movePiece(board, sp_x, sp_y, t_x, t_y);
 
   if (piece_moved) {
