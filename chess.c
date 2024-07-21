@@ -275,7 +275,6 @@ bool validDirection(PieceMovement *movement, unsigned char dx, unsigned char dy,
 bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
 
-  printf("Checkpoint 0\n");
   if (board->king_in_check) {
     printf("Cannot move piece as the king is in check\n");
     return false;
@@ -287,9 +286,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   }
 
 
-  printf("Checkpoint 1\n");
   Piece *sp_piece = getPiece(board, sp_x, sp_y);
-  printf("Checkpoint 2\n");
   Piece *t_piece = getPiece(board, t_x, t_y);
 
   // moving non existent piece should return null
@@ -308,8 +305,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     printf("Cannot attack your own piece\n");
     return false;
   }
-
-  printf("Checkpoint 2\n");
 
   PieceMovement (*movements)[6] = board->movements;
 
