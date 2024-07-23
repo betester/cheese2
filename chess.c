@@ -1,5 +1,6 @@
 
 #include "chess.h"
+#include "raylib.h"
 
 void addPiece(Board *board, Piece new_piece) {
   if (board->current_piece_total + 1 >= MAX_CHESS_PIECE) {
@@ -10,7 +11,7 @@ void addPiece(Board *board, Piece new_piece) {
   board->current_piece_total++;
 }
 
-unsigned char pieceId(Player player, PieceType type) {
+unsigned char pieceId(ChessPlayer player, PieceType type) {
   return (player << 3) | type;
 }
 
@@ -55,7 +56,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   (*movements)[KNIGHT] = knight_movement;
 
   Board board = {
-    .current_player = WHITE,
+    .current_player = WHITE_P,
     .king_in_check = false,
     .pieces = initial_chess_pieces,
     .current_piece_total = 0,
@@ -68,14 +69,14 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     Piece black_piece = {
       .x = 6,
       .y = i,
-      .piece_owner = BLACK,
+      .piece_owner = BLACK_P,
       .piece_type = PAWN,
       .taken = false
     }; 
     Piece white_piece = {
       .x = 1,
       .y = i,
-      .piece_owner = WHITE,
+      .piece_owner = WHITE_P,
       .piece_type = PAWN,
       .taken = false
     }; 
@@ -88,7 +89,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_king = {
     .x = 7,
     .y = 4,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = KING,
     .taken = false
   };
@@ -96,7 +97,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_queen = {
     .x = 7,
     .y = 3, 
-    .piece_owner = BLACK, 
+    .piece_owner = BLACK_P, 
     .piece_type = QUEEN,
     .taken = false
   };
@@ -104,7 +105,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_bishop_left = {
     .x = 7,
     .y = 2,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = BISHOP,
     .taken = false
   };
@@ -112,7 +113,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_knight_left = {
     .x = 7,
     .y = 1,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = KNIGHT,
     .taken = false
   };
@@ -120,7 +121,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_rook_left = {
     .x = 7,
     .y = 0,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = ROOK,
     .taken = false
   };
@@ -128,7 +129,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_bishop_right = {
     .x = 7,
     .y = 5,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = BISHOP,
     .taken = false
   };
@@ -136,7 +137,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_knight_right = {
     .x = 7,
     .y = 6,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = KNIGHT,
     .taken = false
   };
@@ -144,7 +145,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece black_rook_right = {
     .x = 7,
     .y = 7,
-    .piece_owner = BLACK,
+    .piece_owner = BLACK_P,
     .piece_type = ROOK,
     .taken = false
   };
@@ -154,7 +155,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_king = {
     .x = 0,
     .y = 4,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = KING,
     .taken = false
   };
@@ -162,7 +163,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_queen = {
     .x = 0,
     .y = 3,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = QUEEN,
     .taken = false
   };
@@ -170,7 +171,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_bishop_left = {
     .x = 0,
     .y = 2,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = BISHOP,
     .taken = false
   };
@@ -178,7 +179,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_knight_left = {
     .x = 0,
     .y = 1,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = KNIGHT,
     .taken = false
   };
@@ -186,7 +187,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_rook_left = {
     .x = 0,
     .y = 0,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = ROOK,
     .taken = false
   };
@@ -194,7 +195,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_bishop_right = {
     .x = 0,
     .y = 5,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = BISHOP,
     .taken = false
   };
@@ -202,7 +203,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_knight_right = {
     .x = 0,
     .y = 6,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = KNIGHT,
     .taken = false
   };
@@ -210,7 +211,7 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   Piece white_rook_right = {
     .x = 0,
     .y = 7,
-    .piece_owner = WHITE,
+    .piece_owner = WHITE_P,
     .piece_type = ROOK,
     .taken = false
   };
@@ -317,7 +318,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   int dy = t_y - sp_y;
 
   PieceMovement pawn_movement = (*movements)[sp_piece->piece_type];
-  int direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE) ? 1 : -1;
+  int direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE_P) ? 1 : -1;
 
   unsigned char max_diff = pawn_movement.max_diff;
 
@@ -548,23 +549,23 @@ void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4])
 }
 
 void InitPieceSymbols(char (*piece_symbols)[16][5]) {
-    strcpy((*piece_symbols)[pieceId(WHITE, PAWN)], "P");
-    strcpy((*piece_symbols)[pieceId(WHITE, KING)], "K");
-    strcpy((*piece_symbols)[pieceId(WHITE, QUEEN)], "Q");
-    strcpy((*piece_symbols)[pieceId(WHITE, KNIGHT)], "KN");
-    strcpy((*piece_symbols)[pieceId(WHITE, ROOK)], "R");
-    strcpy((*piece_symbols)[pieceId(WHITE, BISHOP)], "B");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, PAWN)], "P");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, KING)], "K");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, QUEEN)], "Q");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, KNIGHT)], "KN");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, ROOK)], "R");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, BISHOP)], "B");
     
-    strcpy((*piece_symbols)[pieceId(BLACK, PAWN)], "p");
-    strcpy((*piece_symbols)[pieceId(BLACK, KING)], "k");
-    strcpy((*piece_symbols)[pieceId(BLACK, QUEEN)], "q");
-    strcpy((*piece_symbols)[pieceId(BLACK, KNIGHT)], "kn");
-    strcpy((*piece_symbols)[pieceId(BLACK, ROOK)], "r");
-    strcpy((*piece_symbols)[pieceId(BLACK, BISHOP)], "b");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, PAWN)], "p");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, KING)], "k");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, QUEEN)], "q");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, KNIGHT)], "kn");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, ROOK)], "r");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, BISHOP)], "b");
     
     // Initialize NEUTRAL pieces if needed
-    strcpy((*piece_symbols)[pieceId(WHITE, NEUTRAL)], " ");
-    strcpy((*piece_symbols)[pieceId(BLACK, NEUTRAL)], " ");
+    strcpy((*piece_symbols)[pieceId(WHITE_P, NEUTRAL)], " ");
+    strcpy((*piece_symbols)[pieceId(BLACK_P, NEUTRAL)], " ");
 }
 
 void UserInput(Board *board, unsigned char (*taken_move)[4]) {
@@ -576,7 +577,7 @@ void UserInput(Board *board, unsigned char (*taken_move)[4]) {
     promotePawn(board, promotion_to);
   } else {
   int sp_x, sp_y, t_x, t_y;
-  printf("Player %d to make the move\n", board->current_player);
+  printf("ChessPlayer %d to make the move\n", board->current_player);
   scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
 
   bool piece_moved = movePiece(board, sp_x, sp_y, t_x, t_y);

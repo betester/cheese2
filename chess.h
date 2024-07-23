@@ -16,7 +16,7 @@ typedef enum PieceType {
   BISHOP
 } PieceType;
 
-typedef enum Player { BLACK, WHITE } Player;
+typedef enum ChessPlayer { BLACK_P, WHITE_P } ChessPlayer;
 
 typedef struct PieceMovement {
   unsigned char max_diff;
@@ -27,14 +27,14 @@ typedef struct PieceMovement {
 typedef struct Piece {
   unsigned char x;
   unsigned char y;
-  Player piece_owner;
+  ChessPlayer piece_owner;
   PieceType piece_type;
   bool taken;
   char last_movement[2];
 } Piece;
 
 typedef struct Board {
-  Player current_player;
+  ChessPlayer current_player;
   bool king_in_check;
   bool checkmated;
   Piece *promoted_pawn;
@@ -43,7 +43,8 @@ typedef struct Board {
   Piece (*pieces)[MAX_CHESS_PIECE];
 } Board;
 
-Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[TOTAL_PIECES]);
+Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE],
+                PieceMovement (*movements)[TOTAL_PIECES]);
 
 void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]);
 
@@ -53,4 +54,5 @@ void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]);
 
 void UserInput(Board *board, unsigned char (*taken_move)[4]);
 
-void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4]);
+void UpdateBoard(unsigned char (*board2d)[8][8],
+                 unsigned char (*taken_move)[4]);
