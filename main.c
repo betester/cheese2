@@ -11,7 +11,7 @@ int main(void) {
   char piece_symbols[16][5] = {0};
   unsigned char taken_move[4] = {0};
 
-  Board board = InitBoard(&pieces,  &movements);
+  Board board = InitBoard(&pieces, &movements);
   MapBoardTo2dBoard(&board, &board2d);
   InitPieceSymbols(&piece_symbols);
   

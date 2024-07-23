@@ -241,9 +241,6 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
     int x_offset = st_x + dx * i;
     int y_offset = st_y + dy * i;
 
-    printf("x : %d\n", x_offset);
-    printf("y : %d\n", y_offset);
-
     if (x_offset == tx && y_offset == ty) {
       continue;
     }
@@ -417,7 +414,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
   }
 
-  bool king_in_check = true;
+  bool king_in_check = false;
 
   for (int i = 0; i < board->current_piece_total;i++) {
     Piece piece = (*board->pieces)[i];
@@ -430,7 +427,19 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     int dx_k = kx - piece.x;
     int dy_k = ky - piece.y;
 
-    king_in_check = king_in_check || validDirection(&piece_movement, dx_k, dy_k, kx, ky);
+    if (validDirection(&piece_movement, dx_k, dy_k, kx, ky)) {
+
+      king_in_check = king_in_check || blockedByNonTargetPiece(
+        board, 
+        piece_movement.max_diff, 
+        piece.x, 
+        piece.y,
+        dx_k, 
+        dy_k,
+        kx,
+        ky
+      );
+    }
 
     unsigned char total_surrounded = 0;
     unsigned char expected_surrounding_for_checkmate = king_movements.total_movement;
@@ -443,7 +452,20 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       int dx_ks = king_surrounding_loc[j][0] - piece.x;
       int dy_ks = king_surrounding_loc[j][1] - piece.y;
 
-      if (validDirection(movements[piece.piece_type], dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
+      bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1]);
+
+      bool piece_attacked_the_surrounding = blockedByNonTargetPiece(
+        board, 
+        max_diff, 
+        piece.x, 
+        piece.y,
+        dx_ks, 
+        dy_ks,
+        king_surrounding_loc[j][0],
+        king_surrounding_loc[j][1]
+      );
+
+      if (piece_can_go_to_surrounding && piece_attacked_the_surrounding) {
         total_surrounded++;
       }
     }
