@@ -37,6 +37,7 @@ typedef struct Board {
   Player current_player;
   bool king_in_check;
   bool checkmated;
+  Piece *promoted_pawn;
   unsigned char current_piece_total;
   PieceMovement (*movements)[TOTAL_PIECES];
   Piece (*pieces)[MAX_CHESS_PIECE];

@@ -59,7 +59,8 @@ Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .king_in_check = false,
     .pieces = initial_chess_pieces,
     .current_piece_total = 0,
-    .movements = movements
+    .movements = movements,
+    .promoted_pawn = NULL
   };
 
   // add pawns
@@ -274,6 +275,10 @@ bool validDirection(PieceMovement *movement, unsigned char dx, unsigned char dy,
 
 bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
+  if (board->promoted_pawn != NULL) {
+    printf("Cannot move the pieces as the pawn should be promoted\n");
+    return false;
+  }
 
   if (board->king_in_check) {
     printf("Cannot move piece as the king is in check\n");
@@ -348,7 +353,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
     // if diagonal steps are taken
 
-    printf("x : %d, y : %d\n", dx, dy * direction);
     if (dx == 1 && (dy == 1 || dy == -1)) {
 
       Piece *sp_beside_piece = getPiece(board, sp_x + dx, sp_y + dy);
@@ -379,10 +383,14 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // update last taken movement
     sp_piece->last_movement[0] = dx;
     sp_piece->last_movement[1] = dy;
-  
-    // change the current allowed player to move
-    board->current_player = (board -> current_player + 1) % 2;
+
+    if (t_x == 0 || t_x == 7) {
+      board->promoted_pawn = sp_piece;
+    }
   }
+
+  // change the current allowed player to move
+  board->current_player = (board -> current_player + 1) % 2;
 
   // TODO: 
   // 1. handle when the king is in check or not for the current player 
@@ -500,6 +508,28 @@ void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]) 
   }
 }
 
+void promotePawn(Board *board, PieceType promotion_type) {
+  Piece *piece = board->promoted_pawn;
+
+  if (piece == NULL || piece->piece_type != PAWN) {
+    printf("Can only promote pawn\n");
+    return;
+  }
+
+  if (promotion_type == PAWN || promotion_type == KING) {
+    printf("Cannot promote to pawn or king\n");
+    return;
+  }
+
+  if (piece->taken) {
+    printf("Cannot promote taken piece\n");
+    return;
+  }
+
+  piece->piece_type = promotion_type;
+  board->promoted_pawn = NULL;
+}
+
 void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4]) {
   int sp_x, sp_y, t_x, t_y;
 
@@ -538,6 +568,13 @@ void InitPieceSymbols(char (*piece_symbols)[16][5]) {
 }
 
 void UserInput(Board *board, unsigned char (*taken_move)[4]) {
+
+  if (board->promoted_pawn != NULL) {
+    PieceType promotion_to;
+    printf("Promote your pawn\n", board->current_player);
+    scanf("%d" , promotion_to);
+    promotePawn(board, promotion_to);
+  } else {
   int sp_x, sp_y, t_x, t_y;
   printf("Player %d to make the move\n", board->current_player);
   scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
@@ -554,5 +591,6 @@ void UserInput(Board *board, unsigned char (*taken_move)[4]) {
     (*taken_move)[1] = 0;
     (*taken_move)[2] = 0;
     (*taken_move)[3] = 0;
+  }
   }
 }
