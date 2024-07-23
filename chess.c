@@ -501,6 +501,13 @@ void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
 }
 
 void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]) {
+  // TODO: 
+  // 1. display the GUI firs which will show tileboard 
+  // 2. place the pieces on tileboard
+  // 3. learn how to render each pieces
+  // 4. learn how to move each piece
+  // 5. learn how to animate attacking pieces
+  // yea thats about it?
   for (int i = 0; i < 8; i++) {
     for (int j = 0; j < 8; j++) {
       printf("%s ", (*piece_symbols)[(*board2d)[i][j]]);
