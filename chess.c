@@ -542,26 +542,6 @@ void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4])
   (*board2d)[t_x][t_y] = prev_id;
 }
 
-void initPieceSymbols(char (*piece_symbols)[16][5]) {
-    strcpy((*piece_symbols)[pieceId(WHITE_P, PAWN)], "P");
-    strcpy((*piece_symbols)[pieceId(WHITE_P, KING)], "K");
-    strcpy((*piece_symbols)[pieceId(WHITE_P, QUEEN)], "Q");
-    strcpy((*piece_symbols)[pieceId(WHITE_P, KNIGHT)], "KN");
-    strcpy((*piece_symbols)[pieceId(WHITE_P, ROOK)], "R");
-    strcpy((*piece_symbols)[pieceId(WHITE_P, BISHOP)], "B");
-    
-    strcpy((*piece_symbols)[pieceId(BLACK_P, PAWN)], "p");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, KING)], "k");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, QUEEN)], "q");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, KNIGHT)], "kn");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, ROOK)], "r");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, BISHOP)], "b");
-    
-    // Initialize NEUTRAL pieces if needed
-    strcpy((*piece_symbols)[pieceId(WHITE_P, NEUTRAL)], " ");
-    strcpy((*piece_symbols)[pieceId(BLACK_P, NEUTRAL)], " ");
-}
-
 void PlayChess() {
   printf("Running Game\n");
 
@@ -573,7 +553,6 @@ void PlayChess() {
 
   Board board = initBoard(&pieces, &movements);
   mapBoardTo2dBoard(&board, &board2d);
-  initPieceSymbols(&piece_symbols);
 
   int width = 800;
   int height = 600;
@@ -581,25 +560,59 @@ void PlayChess() {
   int rectangle_size = 50;
   int padding_size = 5;
 
+
   int offset_x_mid = width/2 - CHESS_BOARD_WIDTH * ((rectangle_size + padding_size)/2);
   int offset_y_mid = height/2 - CHESS_BOARD_HEIGHT * ((rectangle_size + padding_size)/2);
+
+  int circle_x = offset_x_mid + rectangle_size/2;
+  int circle_y = offset_y_mid + rectangle_size/2;
 
   InitWindow(width, height, "Chess Game");
 
   bool initial_color_white = true;
+  bool mouse_pressed = false;
+
+  Vector2 mouse_pressed_pos;
+  Vector2 mouse_released_pos;
 
 
   while (!WindowShouldClose()) {
     BeginDrawing();
-      ClearBackground(RAYWHITE);
-      for (int y = 0; y < CHESS_BOARD_HEIGHT; y++) {
-        bool current_tile_black = !initial_color_white;
-        for (int x = 0; x < CHESS_BOARD_WIDTH; x++) {
-          DrawRectangle(x * (rectangle_size + padding_size) + offset_x_mid, y * (rectangle_size + padding_size) + offset_y_mid, rectangle_size, rectangle_size, current_tile_black ? BLACK : WHITE);
-          current_tile_black = !current_tile_black;
-        }
-        initial_color_white = !initial_color_white;
+    ClearBackground(RAYWHITE);
+    for (int y = 0; y < CHESS_BOARD_HEIGHT; y++) {
+      bool current_tile_black = !initial_color_white;
+      for (int x = 0; x < CHESS_BOARD_WIDTH; x++) {
+        DrawRectangle(x * (rectangle_size + padding_size) + offset_x_mid, y * (rectangle_size + padding_size) + offset_y_mid, rectangle_size, rectangle_size, current_tile_black ? BLACK : WHITE);
+        DrawCircle(circle_x, circle_y, rectangle_size/2, RED);
+        current_tile_black = !current_tile_black;
       }
+      initial_color_white = !initial_color_white;
+    }
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      mouse_pressed = true;
+    }
+
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+      mouse_released_pos = GetMousePosition();
+      int pos_x_diff = mouse_released_pos.x - offset_x_mid; 
+      int pos_y_diff = mouse_released_pos.y - offset_y_mid; 
+
+      int order_x = pos_x_diff/(rectangle_size + padding_size);
+      int order_y = pos_y_diff/(rectangle_size + padding_size);
+
+      circle_x = order_x * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
+      circle_y = order_y * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
+
+      mouse_pressed = false;
+    }
+
+    if (mouse_pressed) {
+      mouse_pressed_pos = GetMousePosition();
+      circle_x = mouse_pressed_pos.x;
+      circle_y = mouse_pressed_pos.y;
+    }
+
     EndDrawing();
   }
 
