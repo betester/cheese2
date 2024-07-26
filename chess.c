@@ -2,6 +2,9 @@
 #include "chess.h"
 #include "raylib.h"
 
+#define CHESS_BOARD_HEIGHT 8
+#define CHESS_BOARD_WIDTH 8
+
 void addPiece(Board *board, Piece new_piece) {
   if (board->current_piece_total + 1 >= MAX_CHESS_PIECE) {
     return;
@@ -15,7 +18,7 @@ unsigned char pieceId(ChessPlayer player, PieceType type) {
   return (player << 3) | type;
 }
 
-Board InitBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[6]) {
+Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[6]) {
 
   PieceMovement pawn_movement = {
     .max_diff = 2, 
@@ -491,28 +494,12 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   return true;
 }
 
-void MapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
+void mapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
   for (int i=0; i < board->current_piece_total; i++) {
     unsigned char x = (*board->pieces)[i].x;
     unsigned char y = (*board->pieces)[i].y;
 
     (*board2d)[x][y] = pieceId((*board->pieces)[i].piece_owner, (*board->pieces)[i].piece_type);
-  }
-}
-
-void DisplayBoard(unsigned char (*board2d)[8][8], char (*piece_symbols)[16][5]) {
-  // TODO: 
-  // 1. display the GUI firs which will show tileboard 
-  // 2. place the pieces on tileboard
-  // 3. learn how to render each pieces
-  // 4. learn how to move each piece
-  // 5. learn how to animate attacking pieces
-  // yea thats about it?
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 8; j++) {
-      printf("%s ", (*piece_symbols)[(*board2d)[i][j]]);
-    }
-    printf("\n");
   }
 }
 
@@ -555,7 +542,7 @@ void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4])
   (*board2d)[t_x][t_y] = prev_id;
 }
 
-void InitPieceSymbols(char (*piece_symbols)[16][5]) {
+void initPieceSymbols(char (*piece_symbols)[16][5]) {
     strcpy((*piece_symbols)[pieceId(WHITE_P, PAWN)], "P");
     strcpy((*piece_symbols)[pieceId(WHITE_P, KING)], "K");
     strcpy((*piece_symbols)[pieceId(WHITE_P, QUEEN)], "Q");
@@ -575,30 +562,46 @@ void InitPieceSymbols(char (*piece_symbols)[16][5]) {
     strcpy((*piece_symbols)[pieceId(BLACK_P, NEUTRAL)], " ");
 }
 
-void UserInput(Board *board, unsigned char (*taken_move)[4]) {
+void PlayChess() {
+  printf("Running Game\n");
 
-  if (board->promoted_pawn != NULL) {
-    PieceType promotion_to;
-    printf("Promote your pawn\n", board->current_player);
-    scanf("%d" , promotion_to);
-    promotePawn(board, promotion_to);
-  } else {
-  int sp_x, sp_y, t_x, t_y;
-  printf("ChessPlayer %d to make the move\n", board->current_player);
-  scanf("%d %d %d %d", &sp_x, &sp_y, &t_x, &t_y);
+  Piece pieces[MAX_CHESS_PIECE] = {0};
+  PieceMovement movements[6] = {0};
+  unsigned char board2d[8][8] = {0};
+  char piece_symbols[16][5] = {0};
+  unsigned char taken_move[4] = {0};
 
-  bool piece_moved = movePiece(board, sp_x, sp_y, t_x, t_y);
+  Board board = initBoard(&pieces, &movements);
+  mapBoardTo2dBoard(&board, &board2d);
+  initPieceSymbols(&piece_symbols);
 
-  if (piece_moved) {
-    (*taken_move)[0] = sp_x;
-    (*taken_move)[1] = sp_y;
-    (*taken_move)[2] = t_x;
-    (*taken_move)[3] = t_y;
-  } else {
-    (*taken_move)[0] = 0;
-    (*taken_move)[1] = 0;
-    (*taken_move)[2] = 0;
-    (*taken_move)[3] = 0;
+  int width = 800;
+  int height = 600;
+
+  int rectangle_size = 50;
+  int padding_size = 5;
+
+  int offset_x_mid = width/2 - CHESS_BOARD_WIDTH * ((rectangle_size + padding_size)/2);
+  int offset_y_mid = height/2 - CHESS_BOARD_HEIGHT * ((rectangle_size + padding_size)/2);
+
+  InitWindow(width, height, "Chess Game");
+
+  bool initial_color_white = true;
+
+
+  while (!WindowShouldClose()) {
+    BeginDrawing();
+      ClearBackground(RAYWHITE);
+      for (int y = 0; y < CHESS_BOARD_HEIGHT; y++) {
+        bool current_tile_black = !initial_color_white;
+        for (int x = 0; x < CHESS_BOARD_WIDTH; x++) {
+          DrawRectangle(x * (rectangle_size + padding_size) + offset_x_mid, y * (rectangle_size + padding_size) + offset_y_mid, rectangle_size, rectangle_size, current_tile_black ? BLACK : WHITE);
+          current_tile_black = !current_tile_black;
+        }
+        initial_color_white = !initial_color_white;
+      }
+    EndDrawing();
   }
-  }
+
+  CloseWindow();
 }
