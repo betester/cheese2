@@ -380,10 +380,10 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // eat the piece
     if (t_piece != NULL && !t_piece->taken) {
       t_piece->taken = true;
-      sp_piece->x = t_x;
-      sp_piece->y = t_y;
     } 
 
+    sp_piece->x = t_x;
+    sp_piece->y = t_y;
     // update last taken movement
     sp_piece->last_movement[0] = dx;
     sp_piece->last_movement[1] = dy;
@@ -564,17 +564,20 @@ void PlayChess() {
   int offset_x_mid = width/2 - CHESS_BOARD_WIDTH * ((rectangle_size + padding_size)/2);
   int offset_y_mid = height/2 - CHESS_BOARD_HEIGHT * ((rectangle_size + padding_size)/2);
 
-  int circle_x = offset_x_mid + rectangle_size/2;
-  int circle_y = offset_y_mid + rectangle_size/2;
+  int circle_x = 3 * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
+  int circle_y = 1 * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
+
+  int last_circle_x, last_circle_y;
 
   InitWindow(width, height, "Chess Game");
 
   bool initial_color_white = true;
   bool mouse_pressed = false;
 
-  Vector2 mouse_pressed_pos;
+
   Vector2 mouse_released_pos;
 
+  int sp_x, sp_y, t_x, t_y;
 
   while (!WindowShouldClose()) {
     BeginDrawing();
@@ -591,6 +594,15 @@ void PlayChess() {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       mouse_pressed = true;
+      Vector2 mouse_pressed_pos = GetMousePosition();
+      int pos_x_diff = mouse_pressed_pos.x - offset_x_mid; 
+      int pos_y_diff = mouse_pressed_pos.y - offset_y_mid; 
+      // inverted because array and coordinate axis is fucked up
+      sp_y = pos_x_diff/(rectangle_size + padding_size);
+      sp_x = pos_y_diff/(rectangle_size + padding_size);
+
+      last_circle_x = circle_x;
+      last_circle_y = circle_y;
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
@@ -601,16 +613,27 @@ void PlayChess() {
       int order_x = pos_x_diff/(rectangle_size + padding_size);
       int order_y = pos_y_diff/(rectangle_size + padding_size);
 
-      circle_x = order_x * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
-      circle_y = order_y * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
+      printf("sp_x %d sp_y %d tx : %d ty %d\n", sp_x, sp_y, order_x, order_y);
+
+      bool piece_moved = movePiece(&board, sp_x, sp_y, order_y, order_x);
+      printf("%d\n", piece_moved); // prints 1
+
+      if (piece_moved) {
+        circle_x = order_x * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
+        circle_y = order_y * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
+      } else {
+        circle_x = last_circle_x;
+        circle_y = last_circle_y;
+        printf("x%d, y%d\n", circle_x, circle_y);
+      }
 
       mouse_pressed = false;
     }
 
     if (mouse_pressed) {
-      mouse_pressed_pos = GetMousePosition();
-      circle_x = mouse_pressed_pos.x;
-      circle_y = mouse_pressed_pos.y;
+      Vector2 mouse_dragged_pos = GetMousePosition();
+      circle_x = mouse_dragged_pos.x;
+      circle_y = mouse_dragged_pos.y;
     }
 
     EndDrawing();
