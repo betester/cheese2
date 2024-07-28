@@ -259,19 +259,21 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   return false;
 }
 
-bool validDirection(PieceMovement *movement, unsigned char dx, unsigned char dy, char x_dir, char y_dir) {
+
+bool validDirection(PieceMovement *movement, char dx, char dy, char x_dir, char y_dir) {
   bool valid_direction = false;
 
-  //TODO: inline this function only called once anyway
-  
   // check if direction is valid
-  for (int i = 0; i < movement->total_movement; i++) {
-    int valid_dx = x_dir * movement->movements[i][0];
-    int valid_dy = y_dir * movement->movements[i][1];
+  for (int j = 1; j <= movement->max_diff; j++) {
+    for (int i = 0; i < movement->total_movement; i++) {
+      char valid_dx = x_dir * movement->movements[i][0];
+      char valid_dy = y_dir * movement->movements[i][1];
 
-    if (valid_dx == dx && valid_dy == dy) {
-      return true;
+      if (j * valid_dx == dx && j * valid_dy == dy) {
+        return true;
+      }
     }
+
   }
 
   return false;
@@ -325,7 +327,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   unsigned char max_diff = pawn_movement.max_diff;
 
-  if (validDirection(&pawn_movement, dx, dy, direction, 1)) {
+  if (!validDirection(&pawn_movement, dx, dy, direction, 1)) {
+    printf("Cannot move piece to direction %d %d with direction %d\n", dx, dy, direction);
     return false;
   }
 
@@ -542,6 +545,15 @@ void UpdateBoard(unsigned char (*board2d)[8][8], unsigned char (*taken_move)[4])
   (*board2d)[t_x][t_y] = prev_id;
 }
 
+Vector2 getNormalizedPosition(int x_offset, int y_offset, int curr_x, int curr_y, int block_size) {
+  int pos_x_diff = curr_x - x_offset; 
+  int pos_y_diff = curr_y - y_offset; 
+
+  // inverted because array and coordinate axis is fucked up
+  Vector2 result = {.x = pos_y_diff/block_size, .y=pos_x_diff/block_size};
+  return result;
+}
+
 void PlayChess() {
   printf("Running Game\n");
 
@@ -559,72 +571,79 @@ void PlayChess() {
 
   int rectangle_size = 50;
   int padding_size = 5;
+  int block_size = rectangle_size + padding_size;
 
-
-  int offset_x_mid = width/2 - CHESS_BOARD_WIDTH * ((rectangle_size + padding_size)/2);
-  int offset_y_mid = height/2 - CHESS_BOARD_HEIGHT * ((rectangle_size + padding_size)/2);
-
-  int circle_x = 3 * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
-  int circle_y = 1 * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
-
-  int last_circle_x, last_circle_y;
-
-  InitWindow(width, height, "Chess Game");
+  int offset_x_mid = width/2 - CHESS_BOARD_WIDTH * (block_size/2);
+  int offset_y_mid = height/2 - CHESS_BOARD_HEIGHT * (block_size/2);
 
   bool initial_color_white = true;
   bool mouse_pressed = false;
 
+  Vector2 mouse_released_pos, normalized_sp;
 
-  Vector2 mouse_released_pos;
+  Vector2 circles[2] = {
+    {.x = 3 * block_size + offset_x_mid + rectangle_size/2, .y = 1 * block_size + offset_y_mid + rectangle_size/2},
+    {.x = 3 * block_size + offset_x_mid + rectangle_size/2, .y = 6 * block_size + offset_y_mid + rectangle_size/2}
+  };
 
-  int sp_x, sp_y, t_x, t_y;
+  int last_circle_p;
+  Vector2 last_circle_v;
+
+  InitWindow(width, height, "Chess Game");
 
   while (!WindowShouldClose()) {
     BeginDrawing();
     ClearBackground(RAYWHITE);
+
+    // drawing the tiles
     for (int y = 0; y < CHESS_BOARD_HEIGHT; y++) {
       bool current_tile_black = !initial_color_white;
       for (int x = 0; x < CHESS_BOARD_WIDTH; x++) {
-        DrawRectangle(x * (rectangle_size + padding_size) + offset_x_mid, y * (rectangle_size + padding_size) + offset_y_mid, rectangle_size, rectangle_size, current_tile_black ? BLACK : WHITE);
-        DrawCircle(circle_x, circle_y, rectangle_size/2, RED);
+        DrawRectangle(x * block_size + offset_x_mid, y * block_size + offset_y_mid, rectangle_size, rectangle_size, current_tile_black ? BLACK : WHITE);
         current_tile_black = !current_tile_black;
       }
       initial_color_white = !initial_color_white;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-      mouse_pressed = true;
-      Vector2 mouse_pressed_pos = GetMousePosition();
-      int pos_x_diff = mouse_pressed_pos.x - offset_x_mid; 
-      int pos_y_diff = mouse_pressed_pos.y - offset_y_mid; 
-      // inverted because array and coordinate axis is fucked up
-      sp_y = pos_x_diff/(rectangle_size + padding_size);
-      sp_x = pos_y_diff/(rectangle_size + padding_size);
+    for (int i = 0; i < 2; i++) {
+      DrawCircle(circles[i].x, circles[i].y, rectangle_size/2, RED);
+    }
 
-      last_circle_x = circle_x;
-      last_circle_y = circle_y;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      Vector2 mouse_pressed_pos = GetMousePosition();
+
+      Vector2 mouse_factor = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_pressed_pos.x, mouse_pressed_pos.y, block_size);
+
+      float x_normalized = mouse_factor.y * block_size + offset_x_mid + rectangle_size/2;
+      float y_normalized = mouse_factor.x * block_size + offset_y_mid + rectangle_size/2;
+
+      for (int i=0; i < 2; i++) {
+
+        if (x_normalized == circles[i].x && y_normalized == circles[i].y) {
+          last_circle_p = i;
+          last_circle_v.x = x_normalized;
+          last_circle_v.y = y_normalized;
+          mouse_pressed = true;
+          normalized_sp = mouse_factor;
+          break;
+        }
+      }
     }
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       mouse_released_pos = GetMousePosition();
-      int pos_x_diff = mouse_released_pos.x - offset_x_mid; 
-      int pos_y_diff = mouse_released_pos.y - offset_y_mid; 
 
-      int order_x = pos_x_diff/(rectangle_size + padding_size);
-      int order_y = pos_y_diff/(rectangle_size + padding_size);
+      Vector2 normalized_target = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_released_pos.x, mouse_released_pos.y, block_size);
 
-      printf("sp_x %d sp_y %d tx : %d ty %d\n", sp_x, sp_y, order_x, order_y);
 
-      bool piece_moved = movePiece(&board, sp_x, sp_y, order_y, order_x);
-      printf("%d\n", piece_moved); // prints 1
+      bool piece_moved = movePiece(&board, normalized_sp.x, normalized_sp.y, normalized_target.x, normalized_target.y);
 
       if (piece_moved) {
-        circle_x = order_x * (rectangle_size + padding_size) + offset_x_mid + rectangle_size/2;
-        circle_y = order_y * (rectangle_size + padding_size) + offset_y_mid + rectangle_size/2;
+        circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid + rectangle_size/2;
+        circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid + rectangle_size/2;
       } else {
-        circle_x = last_circle_x;
-        circle_y = last_circle_y;
-        printf("x%d, y%d\n", circle_x, circle_y);
+        circles[last_circle_p].x = last_circle_v.x;
+        circles[last_circle_p].y = last_circle_v.y;
       }
 
       mouse_pressed = false;
@@ -632,8 +651,8 @@ void PlayChess() {
 
     if (mouse_pressed) {
       Vector2 mouse_dragged_pos = GetMousePosition();
-      circle_x = mouse_dragged_pos.x;
-      circle_y = mouse_dragged_pos.y;
+      circles[last_circle_p].x = mouse_dragged_pos.x;
+      circles[last_circle_p].y = mouse_dragged_pos.y;
     }
 
     EndDrawing();
