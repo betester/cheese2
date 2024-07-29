@@ -403,6 +403,10 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       t_piece = sp_beside_piece;
     }
 
+    if (t_x == 0 || t_x == 7) {
+      board->promoted_pawn = sp_piece;
+    }
+
   }
 
   // eat the piece
@@ -417,10 +421,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   // update last taken movement
   sp_piece->last_movement[0] = dx;
   sp_piece->last_movement[1] = dy;
-
-  if (t_x == 0 || t_x == 7) {
-    board->promoted_pawn = sp_piece;
-  }
 
   // change the current allowed player to move
   board->current_player = (board -> current_player + 1) % 2;
@@ -769,7 +769,7 @@ void PlayChess() {
     EndDrawing();
   }
 
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < 16; i++) {
     UnloadTexture(piece_symbols[i]);
   }
 
