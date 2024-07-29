@@ -366,8 +366,15 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // 2 or 1 step ahead on initial start
 
     // if 2 step but already move then we cant take this step
-    if (dx == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
+    int direction = sp_piece->piece_owner == BLACK_P ? -1 : 1;
+    if (dx == 2 * direction && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
       printf("Cannot move piece 2 step due to already moved previously\n");
+      return false;
+    }
+
+    printf("%d %d\n", dx,  direction);
+    if (dx ==  direction && dy == 0 && t_piece != NULL) {
+      printf("Pawn cannot move forward when there is a piece blocking the way\n");
       return false;
     }
 
@@ -376,7 +383,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     
     Piece *sp_beside_piece = getPiece(board, sp_x, sp_y + dy);
 
-    if (dx == 1 && (dy == 1 || dy == -1) && sp_beside_piece != NULL && sp_beside_piece->piece_owner != sp_piece->piece_owner) {
+    if (dx == 1 * direction && (dy == 1 || dy == -1) && sp_beside_piece != NULL && sp_beside_piece->piece_owner != sp_piece->piece_owner) {
 
       if (t_piece != NULL) {
         printf("Cannot do en passant if the target position is not empty%s\n");
