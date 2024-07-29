@@ -234,7 +234,7 @@ Piece *getPiece(Board *board, int x, int y) {
 }
 
 bool positionOutofBound(int x, int y) {
-  return x < 0 || x >= MAX_CHESS_PIECE || y < 0 || y >= MAX_CHESS_PIECE;
+  return x < 0 || x >= 8 || y < 0 || y >= 8;
 }
 
 bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, int dx, int dy, int tx, int ty) {
@@ -273,6 +273,7 @@ bool validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
   // check if direction is valid
   for (char j = 1; j <= movement->max_diff; j++) {
     for (int i = 0; i < movement->total_movement; i++) {
+      assert(i < 8);
       char valid_dx = movement->movements[i][0];
       char valid_dy = movement->movements[i][1];
 
@@ -314,7 +315,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   // moving non existent piece should return null
   if (sp_piece == NULL) {
-    printf("Cannot move empty piece\n");
+    printf("Cannot move empty piece, not found position %d %d\n", sp_x, sp_y);
     return false;
   }
 
@@ -402,6 +403,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     printf("type %d\n", t_piece->piece_type);
     t_piece->taken = true;
   } 
+
 
   sp_piece->x = t_x;
   sp_piece->y = t_y;
@@ -512,7 +514,17 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   }
 
 
-  printf("sp_piece x : %d sp_piece y : %d\n", sp_piece->x, sp_piece->y);
+  if (sp_piece->piece_type == PAWN) {
+    printf("sp_piece x : %d sp_piece y : %d\n", sp_piece->x, sp_piece->y);
+    printf("t_x : %d t_y : %d\n", t_x, t_y);
+    printf("sp_x : %d sp_y: %d\n", sp_x, sp_y);
+  }
+  
+  for (int i = 0; i < board->current_piece_total; i++) {
+    if ((*board->pieces)[i].piece_type == QUEEN)
+  
+      printf("x : %d y : %d\n", (*board->pieces)[i].x, (*board->pieces)[i].y);
+  }
 
   return true;
 }
@@ -605,6 +617,7 @@ void PlayChess() {
 
   InitWindow(width, height, "Chess Game");
 
+
   while (!WindowShouldClose()) {
     BeginDrawing();
     ClearBackground(RAYWHITE);
@@ -620,11 +633,6 @@ void PlayChess() {
     }
 
     for (int i = 0; i < board.current_piece_total; i++) {
-      // TODO: might just put directly on the circles of the color but checking whether it's white or black seems to be fine.
-
-      // if (checkpoint) {
-      //   printf("it reaches here\n");
-      // }
 
       if (pieces[i].taken) {
         continue;
@@ -642,9 +650,12 @@ void PlayChess() {
       float x_normalized = mouse_factor.y * block_size + offset_x_mid + rectangle_size/2;
       float y_normalized = mouse_factor.x * block_size + offset_y_mid + rectangle_size/2;
 
-      printf("%f %f\n", x_normalized, y_normalized);
 
       for (int i=0; i < board.current_piece_total; i++) {
+
+        if (pieces[i].taken) {
+          continue;
+        }
 
         if (x_normalized == circles[i].x && y_normalized == circles[i].y) {
           last_circle_p = i;
@@ -655,9 +666,10 @@ void PlayChess() {
           break;
         }
       }
+
     }
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && mouse_pressed) {
       mouse_released_pos = GetMousePosition();
 
       Vector2 normalized_target = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_released_pos.x, mouse_released_pos.y, block_size);
@@ -672,14 +684,6 @@ void PlayChess() {
         circles[last_circle_p].x = last_circle_v.x;
         circles[last_circle_p].y = last_circle_v.y;
       }
-
-      Vector2 nromalized_source = getNormalizedPosition(offset_x_mid, offset_y_mid, last_circle_v.x, last_circle_v.y, block_size);
-
-      printf("last_circle_v.x : %f, last_circle_v.y : %f, x : %f, y :%f\n", last_circle_v.x, last_circle_v.y, nromalized_source.x, nromalized_source.y);
-
-      // if (normalized_target.x == 4f && normalized_target.y == 4f && normalized_target == ) {
-      //   checkpoint = true;
-      // }
 
       last_circle_p = -1;
       last_circle_v.x = 0;
