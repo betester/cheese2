@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define MAX_CHESS_PIECE 64
-#define TOTAL_PIECES 6
+#define TOTAL_PIECES 7 
 
 typedef enum PieceType {
   NEUTRAL,
@@ -21,7 +21,7 @@ typedef enum ChessPlayer { BLACK_P, WHITE_P } ChessPlayer;
 typedef struct PieceMovement {
   unsigned char max_diff;
   unsigned char total_movement;
-  unsigned char movements[8][2];
+  char movements[8][2];
 } PieceMovement;
 
 typedef struct Piece {

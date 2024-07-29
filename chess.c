@@ -19,7 +19,7 @@ unsigned char pieceId(ChessPlayer player, PieceType type) {
   return (player << 3) | type;
 }
 
-Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[6]) {
+Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*movements)[TOTAL_PIECES]) {
 
   PieceMovement pawn_movement = {
     .max_diff = 2, 
@@ -37,12 +37,12 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .movements = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}, {-1, 1}, {1, 1}, {-1, -1}, {1, -1}}
   };
   PieceMovement bishop_movement = {
-    .max_diff = 8, 
+    .max_diff = 7, 
     .total_movement = 4,
     .movements = {{-1, 1}, {1, 1}, {-1, -1}, {1, -1}}
   };
   PieceMovement rook_movement = {
-    .max_diff = 8, 
+    .max_diff = 7, 
     .total_movement = 4,
     .movements = {{-1, 0}, {1, 0}, {0, 1}, {0, -1}}
   };
@@ -56,7 +56,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   (*movements)[KING] = king_movement;
   (*movements)[QUEEN] = queen_movement;
   (*movements)[BISHOP] = bishop_movement;
-  (*movements)[ROOK] = bishop_movement;
+  (*movements)[ROOK] = rook_movement;
   (*movements)[KNIGHT] = knight_movement;
 
   Board board = {
@@ -276,11 +276,6 @@ bool validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
       char valid_dx = movement->movements[i][0];
       char valid_dy = movement->movements[i][1];
 
-      if (type == BISHOP) {
-        printf("%d\n", type);
-        printf("%d %d %d %d\n", j * valid_dx, j * valid_dy, valid_dx, valid_dy);
-      }
-
       if (j * valid_dx == dx && j * valid_dy == dy) {
         return true;
       }
@@ -295,6 +290,11 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   if (board->promoted_pawn != NULL) {
     printf("Cannot move the pieces as the pawn should be promoted\n");
+    return false;
+  }
+
+  if (sp_x == t_x && t_x == t_y) {
+    printf("Cannot move back to the same position\n");
     return false;
   }
 
@@ -329,7 +329,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     return false;
   }
 
-  PieceMovement (*movements)[6] = board->movements;
+  PieceMovement (*movements)[TOTAL_PIECES] = board->movements;
 
   int dx = t_x - sp_x;
   int dy = t_y - sp_y;
@@ -569,7 +569,7 @@ void PlayChess() {
   printf("Running Game\n");
 
   Piece pieces[MAX_CHESS_PIECE] = {0};
-  PieceMovement movements[6] = {0};
+  PieceMovement movements[TOTAL_PIECES] = {0};
   char piece_symbols[16][5] = {0};
   unsigned char taken_move[4] = {0};
 
@@ -666,7 +666,6 @@ void PlayChess() {
       bool piece_moved = movePiece(&board, normalized_sp.x, normalized_sp.y, normalized_target.x, normalized_target.y);
 
       if (piece_moved) {
-        assert(last_circle_p != -1);
         circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid + rectangle_size/2;
         circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid + rectangle_size/2;
       } else {
