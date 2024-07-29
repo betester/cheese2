@@ -1,6 +1,7 @@
 
 #include "chess.h"
 #include "raylib.h"
+#include <assert.h>
 
 #define CHESS_BOARD_HEIGHT 8
 #define CHESS_BOARD_WIDTH 8
@@ -225,7 +226,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
 
 Piece *getPiece(Board *board, int x, int y) {
   for (int i = 0; i < board->current_piece_total; i++) {
-    if ((*board->pieces)[i].x == x && (*board->pieces)[i].y == y) {
+    if ((*board->pieces)[i].x == x && (*board->pieces)[i].y == y && !(*board->pieces)[i].taken) {
       return &(*board->pieces)[i];
     }
   }
@@ -247,11 +248,13 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
     int y_offset = st_y + dy * i;
 
     if (x_offset == tx && y_offset == ty) {
-      continue;
+      break;
     }
 
     Piece *piece = getPiece(board, x_offset, y_offset);
-    if (piece != NULL){
+    if (piece != NULL && !piece->taken){
+      printf("type block : %d\n", piece->piece_type);
+      printf("piece exist on x : %d y : %d\n", x_offset, y_offset);
       return true;
     }
   }
@@ -260,14 +263,23 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
 }
 
 
-bool validDirection(PieceMovement *movement, char dx, char dy, char x_dir, char y_dir) {
+bool validDirection(PieceMovement *movement, char dx, char dy, PieceType type, ChessPlayer player) {
   bool valid_direction = false;
 
+  if (type == PAWN && player == BLACK_P) {
+    dx = dx * -1;
+  }
+
   // check if direction is valid
-  for (int j = 1; j <= movement->max_diff; j++) {
+  for (char j = 1; j <= movement->max_diff; j++) {
     for (int i = 0; i < movement->total_movement; i++) {
-      char valid_dx = x_dir * movement->movements[i][0];
-      char valid_dy = y_dir * movement->movements[i][1];
+      char valid_dx = movement->movements[i][0];
+      char valid_dy = movement->movements[i][1];
+
+      if (type == BISHOP) {
+        printf("%d\n", type);
+        printf("%d %d %d %d\n", j * valid_dx, j * valid_dy, valid_dx, valid_dy);
+      }
 
       if (j * valid_dx == dx && j * valid_dy == dy) {
         return true;
@@ -322,13 +334,12 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   int dx = t_x - sp_x;
   int dy = t_y - sp_y;
 
-  PieceMovement pawn_movement = (*movements)[sp_piece->piece_type];
-  int direction = (sp_piece->piece_type == PAWN && sp_piece->piece_owner == WHITE_P) ? 1 : -1;
+  PieceMovement movement = (*movements)[sp_piece->piece_type];
 
-  unsigned char max_diff = pawn_movement.max_diff;
+  unsigned char max_diff = movement.max_diff;
 
-  if (!validDirection(&pawn_movement, dx, dy, direction, 1)) {
-    printf("Cannot move piece to direction %d %d with direction %d\n", dx, dy, direction);
+  if (!validDirection(&movement, dx, dy, sp_piece->piece_type, sp_piece->piece_owner)) {
+    printf("Cannot move piece to direction %d %d\n", dx, dy);
     return false;
   }
 
@@ -355,14 +366,16 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
     // if 2 step but already move then we cant take this step
     if (dx == 2 && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
+      printf("Cannot move piece 2 step due to already moved previously\n");
       return false;
     }
 
     // if diagonal steps are taken
+    // it's either en passant or taking piece from the diagonal side
+    
+    Piece *sp_beside_piece = getPiece(board, sp_x, sp_y + dy);
 
-    if (dx == 1 && (dy == 1 || dy == -1)) {
-
-      Piece *sp_beside_piece = getPiece(board, sp_x + dx, sp_y + dy);
+    if (dx == 1 && (dy == 1 || dy == -1) && sp_beside_piece != NULL && sp_beside_piece->piece_owner != sp_piece->piece_owner) {
 
       if (t_piece != NULL) {
         printf("Cannot do en passant if the target position is not empty%s\n");
@@ -373,27 +386,31 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
         printf("Cannot do en passant no piece on the direction\n");
         return false;
       }
+      printf("%d\n", sp_beside_piece->last_movement[0]);
 
       if (!(sp_beside_piece->last_movement[0] == 2 && sp_beside_piece->last_movement[1] == 0)) {
         printf("Cannot do en passant if two steps are not taken\n");
         return false;
       }
+      t_piece = sp_beside_piece;
     }
 
-    // eat the piece
-    if (t_piece != NULL && !t_piece->taken) {
-      t_piece->taken = true;
-    } 
+  }
 
-    sp_piece->x = t_x;
-    sp_piece->y = t_y;
-    // update last taken movement
-    sp_piece->last_movement[0] = dx;
-    sp_piece->last_movement[1] = dy;
+  // eat the piece
+  if (t_piece != NULL && !t_piece->taken) {
+    printf("type %d\n", t_piece->piece_type);
+    t_piece->taken = true;
+  } 
 
-    if (t_x == 0 || t_x == 7) {
-      board->promoted_pawn = sp_piece;
-    }
+  sp_piece->x = t_x;
+  sp_piece->y = t_y;
+  // update last taken movement
+  sp_piece->last_movement[0] = dx;
+  sp_piece->last_movement[1] = dy;
+
+  if (t_x == 0 || t_x == 7) {
+    board->promoted_pawn = sp_piece;
   }
 
   // change the current allowed player to move
@@ -442,7 +459,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     int dx_k = kx - piece.x;
     int dy_k = ky - piece.y;
 
-    if (validDirection(&piece_movement, dx_k, dy_k, kx, ky)) {
+    if (validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner)) {
 
       king_in_check = king_in_check || blockedByNonTargetPiece(
         board, 
@@ -467,7 +484,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       int dx_ks = king_surrounding_loc[j][0] - piece.x;
       int dy_ks = king_surrounding_loc[j][1] - piece.y;
 
-      bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, king_surrounding_loc[j][0], king_surrounding_loc[j][1]);
+      bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, piece.piece_type, piece.piece_owner);
 
       bool piece_attacked_the_surrounding = blockedByNonTargetPiece(
         board, 
@@ -494,16 +511,10 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     }
   }
 
+
+  printf("sp_piece x : %d sp_piece y : %d\n", sp_piece->x, sp_piece->y);
+
   return true;
-}
-
-void mapBoardTo2dBoard(Board *board, unsigned char (*board2d)[8][8]) {
-  for (int i=0; i < board->current_piece_total; i++) {
-    unsigned char x = (*board->pieces)[i].x;
-    unsigned char y = (*board->pieces)[i].y;
-
-    (*board2d)[x][y] = pieceId((*board->pieces)[i].piece_owner, (*board->pieces)[i].piece_type);
-  }
 }
 
 void promotePawn(Board *board, PieceType promotion_type) {
@@ -559,12 +570,10 @@ void PlayChess() {
 
   Piece pieces[MAX_CHESS_PIECE] = {0};
   PieceMovement movements[6] = {0};
-  unsigned char board2d[8][8] = {0};
   char piece_symbols[16][5] = {0};
   unsigned char taken_move[4] = {0};
 
   Board board = initBoard(&pieces, &movements);
-  mapBoardTo2dBoard(&board, &board2d);
 
   int width = 800;
   int height = 600;
@@ -581,13 +590,18 @@ void PlayChess() {
 
   Vector2 mouse_released_pos, normalized_sp;
 
-  Vector2 circles[2] = {
-    {.x = 3 * block_size + offset_x_mid + rectangle_size/2, .y = 1 * block_size + offset_y_mid + rectangle_size/2},
-    {.x = 3 * block_size + offset_x_mid + rectangle_size/2, .y = 6 * block_size + offset_y_mid + rectangle_size/2}
-  };
+  // TODO: consider if we can just store the pice normalized position based on the logic part
+  Vector2 circles[MAX_CHESS_PIECE] = {0};
+
+  for (int i=0; i < board.current_piece_total; i++) {
+    // should be no problem not checking if the piece exist or not. 
+    circles[i].x = pieces[i].y * block_size + offset_x_mid + rectangle_size/2;
+    circles[i].y = pieces[i].x * block_size + offset_y_mid + rectangle_size/2;
+  }
 
   int last_circle_p;
   Vector2 last_circle_v;
+  bool check_point = false;
 
   InitWindow(width, height, "Chess Game");
 
@@ -605,8 +619,19 @@ void PlayChess() {
       initial_color_white = !initial_color_white;
     }
 
-    for (int i = 0; i < 2; i++) {
-      DrawCircle(circles[i].x, circles[i].y, rectangle_size/2, RED);
+    for (int i = 0; i < board.current_piece_total; i++) {
+      // TODO: might just put directly on the circles of the color but checking whether it's white or black seems to be fine.
+
+      // if (checkpoint) {
+      //   printf("it reaches here\n");
+      // }
+
+      if (pieces[i].taken) {
+        continue;
+      }
+
+      Color color = pieces[i].piece_owner == WHITE_P ? RED : BLUE;
+      DrawCircle(circles[i].x, circles[i].y, rectangle_size/2, color);
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -617,7 +642,9 @@ void PlayChess() {
       float x_normalized = mouse_factor.y * block_size + offset_x_mid + rectangle_size/2;
       float y_normalized = mouse_factor.x * block_size + offset_y_mid + rectangle_size/2;
 
-      for (int i=0; i < 2; i++) {
+      printf("%f %f\n", x_normalized, y_normalized);
+
+      for (int i=0; i < board.current_piece_total; i++) {
 
         if (x_normalized == circles[i].x && y_normalized == circles[i].y) {
           last_circle_p = i;
@@ -639,6 +666,7 @@ void PlayChess() {
       bool piece_moved = movePiece(&board, normalized_sp.x, normalized_sp.y, normalized_target.x, normalized_target.y);
 
       if (piece_moved) {
+        assert(last_circle_p != -1);
         circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid + rectangle_size/2;
         circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid + rectangle_size/2;
       } else {
@@ -646,6 +674,17 @@ void PlayChess() {
         circles[last_circle_p].y = last_circle_v.y;
       }
 
+      Vector2 nromalized_source = getNormalizedPosition(offset_x_mid, offset_y_mid, last_circle_v.x, last_circle_v.y, block_size);
+
+      printf("last_circle_v.x : %f, last_circle_v.y : %f, x : %f, y :%f\n", last_circle_v.x, last_circle_v.y, nromalized_source.x, nromalized_source.y);
+
+      // if (normalized_target.x == 4f && normalized_target.y == 4f && normalized_target == ) {
+      //   checkpoint = true;
+      // }
+
+      last_circle_p = -1;
+      last_circle_v.x = 0;
+      last_circle_v.y = 0;
       mouse_pressed = false;
     }
 
