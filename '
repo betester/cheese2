@@ -600,20 +600,16 @@ void initPieceSymbols(Texture2D (*piece_symbols)[16]) {
   Image black_knight_image = LoadImage("assets/b-knight.png");
   Image black_rook_image = LoadImage("assets/b-rook.png");
 
-  ImageResize(&white_pawn_image, 50, 50);
-  ImageResize(&white_queen_image, 50, 50);
-  ImageResize(&white_king_image, 50, 50);
-  ImageResize(&white_bishop_image, 50, 50);
-  ImageResize(&white_knight_image, 50, 50);
-  ImageResize(&white_rook_image, 50, 50);
 
-  ImageResize(&black_pawn_image, 50, 50);
-  ImageResize(&black_queen_image, 50, 50);
-  ImageResize(&black_king_image, 50, 50);
-  ImageResize(&black_bishop_image, 50, 50);
-  ImageResize(&black_knight_image, 50, 50);
-  ImageResize(&black_rook_image, 50, 50);
+  printf("%d\n", pieceId(WHITE_P, PAWN));
+  prinft("%d\n", pieceId(WHITE_P, KING));
+  printf("%d\n", pieceId(WHITE_P, QUEEN));
+  printf("%d\n", pieceId(WHITE_P, KNIGHT));
+  printf("%d\n", pieceId(WHITE_P, BISHOP));
 
+  printf("%d\n", pieceId(BLACK_P, PAWN));
+  printf("%d\n", pieceId(BLACK_P, KING));
+  printf("%d\n", pieceId(BLACK_P, QUEEN));
 
   (*piece_symbols)[pieceId(WHITE_P, PAWN)] = LoadTextureFromImage(white_pawn_image);
   (*piece_symbols)[pieceId(WHITE_P, KING)] = LoadTextureFromImage(white_king_image);
@@ -622,13 +618,16 @@ void initPieceSymbols(Texture2D (*piece_symbols)[16]) {
   (*piece_symbols)[pieceId(WHITE_P, ROOK)] =  LoadTextureFromImage(white_rook_image);
   (*piece_symbols)[pieceId(WHITE_P, BISHOP)] = LoadTextureFromImage(white_bishop_image);
 
+  printf("%d\n", pieceId(BLACK_P, KNIGHT));
+  printf("%d\n", pieceId(BLACK_P, KNIGHT));
   (*piece_symbols)[pieceId(BLACK_P, PAWN)] = LoadTextureFromImage(black_pawn_image);
+  printf("%d\n", pieceId(BLACK_P, ROOK));
   (*piece_symbols)[pieceId(BLACK_P, KING)] = LoadTextureFromImage(black_king_image);
+  printf("%d\n", pieceId(BLACK_P, BISHOP));
   (*piece_symbols)[pieceId(BLACK_P, QUEEN)] = LoadTextureFromImage(black_queen_image);
   (*piece_symbols)[pieceId(BLACK_P, KNIGHT)] = LoadTextureFromImage(black_knight_image);
   (*piece_symbols)[pieceId(BLACK_P, ROOK)] = LoadTextureFromImage(black_rook_image);
   (*piece_symbols)[pieceId(BLACK_P, BISHOP)] = LoadTextureFromImage(black_bishop_image);
-
 
   UnloadImage(white_pawn_image);
   UnloadImage(white_queen_image);
@@ -654,6 +653,7 @@ void PlayChess() {
   unsigned char taken_move[4] = {0};
 
   Board board = initBoard(&pieces, &movements);
+  initPieceSymbols(&piece_symbols);
   printf("fuck you");
 
   int width = 800;
@@ -676,8 +676,8 @@ void PlayChess() {
 
   for (int i=0; i < board.current_piece_total; i++) {
     // should be no problem not checking if the piece exist or not. 
-    circles[i].x = pieces[i].y * block_size + offset_x_mid;
-    circles[i].y = pieces[i].x * block_size + offset_y_mid;
+    circles[i].x = pieces[i].y * block_size + offset_x_mid + rectangle_size/2;
+    circles[i].y = pieces[i].x * block_size + offset_y_mid + rectangle_size/2;
   }
 
   int last_circle_p;
@@ -685,7 +685,6 @@ void PlayChess() {
   bool check_point = false;
 
   InitWindow(width, height, "Chess Game");
-  initPieceSymbols(&piece_symbols);
 
 
   while (!WindowShouldClose()) {
@@ -708,7 +707,8 @@ void PlayChess() {
         continue;
       }
 
-      DrawTexture(piece_symbols[pieceId(pieces[i].piece_owner, pieces[i].piece_type)], circles[i].x, circles[i].y , WHITE);
+      Color color = pieces[i].piece_owner == WHITE_P ? WHITE: BLACK;
+      DrawTexture(piece_symbols[pieceId(pieces[i].piece_owner, pieces[i].piece_type)], circles[i].x, circles[i].y , color);
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -716,8 +716,8 @@ void PlayChess() {
 
       Vector2 mouse_factor = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_pressed_pos.x, mouse_pressed_pos.y, block_size);
 
-      float x_normalized = mouse_factor.y * block_size + offset_x_mid;
-      float y_normalized = mouse_factor.x * block_size + offset_y_mid;
+      float x_normalized = mouse_factor.y * block_size + offset_x_mid + rectangle_size/2;
+      float y_normalized = mouse_factor.x * block_size + offset_y_mid + rectangle_size/2;
 
 
       for (int i=0; i < board.current_piece_total; i++) {
@@ -747,8 +747,8 @@ void PlayChess() {
       bool piece_moved = movePiece(&board, normalized_sp.x, normalized_sp.y, normalized_target.x, normalized_target.y);
 
       if (piece_moved) {
-        circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid;
-        circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid;
+        circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid + rectangle_size/2;
+        circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid + rectangle_size/2;
       } else {
         circles[last_circle_p].x = last_circle_v.x;
         circles[last_circle_p].y = last_circle_v.y;
@@ -762,8 +762,8 @@ void PlayChess() {
 
     if (mouse_pressed) {
       Vector2 mouse_dragged_pos = GetMousePosition();
-      circles[last_circle_p].x = mouse_dragged_pos.x - rectangle_size/2;
-      circles[last_circle_p].y = mouse_dragged_pos.y - rectangle_size/2;
+      circles[last_circle_p].x = mouse_dragged_pos.x;
+      circles[last_circle_p].y = mouse_dragged_pos.y;
     }
 
     EndDrawing();
