@@ -96,7 +96,8 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .y = 4,
     .piece_owner = BLACK_P,
     .piece_type = KING,
-    .taken = false
+    .taken = false,
+    .last_movement = {-1}
   };
   addPiece(&board, black_king);
   Piece black_queen = {
@@ -162,7 +163,8 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .y = 4,
     .piece_owner = WHITE_P,
     .piece_type = KING,
-    .taken = false
+    .taken = false,
+    .last_movement = {-1}
   };
   addPiece(&board, white_king);
   Piece white_queen = {
@@ -350,12 +352,6 @@ int getKingCondition(Board *board) {
     int dx_k = kx - piece.x;
     int dy_k = ky - piece.y;
 
-
-    if (piece.piece_type == BISHOP) {
-      printf("piece.x %d piece.y %d \n", piece.x, piece.y);
-      printf("dx_k %d dy_k %d\n", dx_k, dy_k);
-    }
-
     char king_valid_direction[2] = {0};
     validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &king_valid_direction);
 
@@ -446,6 +442,37 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     return false;
   }
 
+  // Indication that the player might want to castle
+  if (sp_piece->piece_type == KING && t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner && t_piece->piece_type == ROOK) {
+
+    if (board->king_in_check) {
+      printf("Cannot castle as the king is under attack\n");
+      return false;
+    }
+
+    if (!(sp_piece->last_movement[0] == -1 && sp_piece->last_movement[1] == -1) && !(t_piece->last_movement[0] == -1 && t_piece->last_movement[1] == -1)) {
+      printf("Cannot castle because one of the piece already moved");
+      return false;
+    }
+
+    // the king position should be valid assuming that last movement is always assigned
+    // TODO: handle when a pawn promotes to a rook
+
+    //  check whether the rook is on the king side or the queen side of the king.
+    //  king side would be that the rook has a bigger value in y coordinate
+
+    //  
+    int diff = t_piece->y - sp_piece->y;
+    bool king_side = diff > 0;
+  
+    // need to check whether two blocks is attacked by other pieces.
+    if (king_side) {
+
+    } else {
+
+    }
+  }
+
   if (t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner) {
     printf("Cannot attack your own piece\n");
     return false;
@@ -480,8 +507,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     t_x,
     t_y
   );
-
-    printf("How about here\n");
 
   if (blocked) {
     printf("Cannot move to target due to blocked by other piece\n");
@@ -535,8 +560,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       board->promoted_pawn = sp_piece;
     }
 
-  }
-
+  } 
   // change the current allowed player to move
   bool current_king_condition = board->king_in_check;
 
