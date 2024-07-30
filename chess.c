@@ -1,4 +1,6 @@
 
+// TODO: there is a bug where pawn can move diagonally even though there was no piece there.
+
 #include "chess.h"
 #include "raylib.h"
 #include <assert.h>
@@ -229,7 +231,6 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
 
 Piece *getPiece(Board *board, int x, int y) {
   for (int i = 0; i < board->current_piece_total; i++) {
-    printf("%d\n", i);
     if ((*board->pieces)[i].x == x && (*board->pieces)[i].y == y && !(*board->pieces)[i].taken) {
       return &(*board->pieces)[i];
     }
@@ -303,6 +304,44 @@ void validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
  * Returns 10 : in check
  * Return 00 : save
 */
+
+bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y, ChessPlayer attacking_player) {
+  PieceMovement (*movements)[TOTAL_PIECES] = board->movements;
+  bool position_under_attack = false;
+
+  for (int i = 0; i < board->current_piece_total;i++) {
+    Piece piece = (*board->pieces)[i];
+
+    if (piece.piece_owner == attacking_player || piece.taken) {
+      continue;
+    }
+
+    PieceMovement piece_movement = (*movements)[piece.piece_type];
+
+    int dx_k = x - piece.x;
+    int dy_k = y - piece.y;
+
+    char king_valid_direction[2] = {0};
+    validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &king_valid_direction);
+
+    if (!(king_valid_direction[0] == 0 && king_valid_direction[1] == 0))  {
+
+      position_under_attack = position_under_attack || !blockedByNonTargetPiece(
+        board, 
+        piece_movement.max_diff, 
+        piece.x, 
+        piece.y,
+        king_valid_direction[0], 
+        king_valid_direction[1],
+        x,
+        y 
+      );
+    }
+  }
+
+  return position_under_attack;
+}
+
 int getKingCondition(Board *board) {
   // TODO: 
   // 1. handle when the king is in check or not for the current player 
@@ -311,9 +350,6 @@ int getKingCondition(Board *board) {
   // this needs to know whether the king is on check or not. but the idea is to see every possible direction the king can go
   // then check whether it's possible to move to certain position if it's not attacked and not occupied. checkmate happens only if 
   // the king is on check with nowhere to go.
-
-  // finding the king position
-  // finding the king position
 
   Piece *opponent_king;
   PieceMovement (*movements)[TOTAL_PIECES] = board->movements; 
@@ -337,67 +373,8 @@ int getKingCondition(Board *board) {
     king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
   }
 
-  bool king_in_check = false;
+  bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, board->current_player);
   bool checkmated = false;
-
-  for (int i = 0; i < board->current_piece_total;i++) {
-    Piece piece = (*board->pieces)[i];
-
-    if (piece.piece_owner == board->current_player || piece.taken) {
-      continue;
-    }
-
-    PieceMovement piece_movement = (*movements)[piece.piece_type];
-
-    int dx_k = kx - piece.x;
-    int dy_k = ky - piece.y;
-
-    char king_valid_direction[2] = {0};
-    validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &king_valid_direction);
-
-    if (!(king_valid_direction[0] == 0 && king_valid_direction[1] == 0))  {
-
-      king_in_check = king_in_check || !blockedByNonTargetPiece(
-        board, 
-        piece_movement.max_diff, 
-        piece.x, 
-        piece.y,
-        king_valid_direction[0], 
-        king_valid_direction[1],
-        kx,
-        ky
-      );
-    }
-
-    unsigned char total_surrounded = 0;
-    unsigned char expected_surrounding_for_checkmate = king_movements.total_movement;
-
-  //   for (int j = 0; j < king_movements.total_movement; j++) {
-  //     if (positionOutofBound(king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
-  //       expected_surrounding_for_checkmate--;
-  //       continue;
-  //     }
-  //     int dx_ks = king_surrounding_loc[j][0] - piece.x;
-  //     int dy_ks = king_surrounding_loc[j][1] - piece.y;
-  //
-  //     bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, piece.piece_type, piece.piece_owner);
-  //
-  //     bool piece_attacked_the_surrounding = blockedByNonTargetPiece(
-  //       board, 
-  //       piece_movement.max_diff, 
-  //       piece.x, 
-  //       piece.y,
-  //       dx_ks, 
-  //       dy_ks,
-  //       king_surrounding_loc[j][0],
-  //       king_surrounding_loc[j][1]
-  //     );
-  //
-  //     if (piece_can_go_to_surrounding && piece_attacked_the_surrounding) {
-  //       total_surrounded++;
-  //     }
-  //   }
-  }
 
   int king_condition = 0;
   king_condition = king_condition | (king_in_check << 1) | checkmated;
