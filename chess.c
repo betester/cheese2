@@ -99,7 +99,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .piece_owner = BLACK_P,
     .piece_type = KING,
     .taken = false,
-    .last_movement = {-1}
+    .last_movement = {-1, -1}
   };
   addPiece(&board, black_king);
   Piece black_queen = {
@@ -166,7 +166,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .piece_owner = WHITE_P,
     .piece_type = KING,
     .taken = false,
-    .last_movement = {-1}
+    .last_movement = {-1, -1}
   };
   addPiece(&board, white_king);
   Piece white_queen = {
@@ -198,7 +198,8 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .y = 0,
     .piece_owner = WHITE_P,
     .piece_type = ROOK,
-    .taken = false
+    .taken = false,
+    .last_movement = {-1, -1}
   };
   addPiece(&board, white_rook_left);
   Piece white_bishop_right = {
@@ -222,7 +223,9 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
     .y = 7,
     .piece_owner = WHITE_P,
     .piece_type = ROOK,
-    .taken = false
+    .taken = false,
+    .last_movement = {-1, -1}
+
   };
   addPiece(&board, white_rook_right);
 
@@ -384,12 +387,14 @@ int getKingCondition(Board *board) {
 
 bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
+  printf("%d, %d, %d, %d\n", sp_x, sp_y, t_x, t_y);
+
   if (board->promoted_pawn != NULL) {
     printf("Cannot move the pieces as the pawn should be promoted\n");
     return false;
   }
 
-  if (sp_x == t_x && t_x == t_y) {
+  if (sp_x == t_x && sp_y == t_y) {
     printf("Cannot move back to the same position\n");
     return false;
   }
@@ -428,6 +433,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     }
 
     if (!(sp_piece->last_movement[0] == -1 && sp_piece->last_movement[1] == -1) && !(t_piece->last_movement[0] == -1 && t_piece->last_movement[1] == -1)) {
+      printf("%d %d %d %d\n", sp_piece->last_movement[0], sp_piece->last_movement[1], t_piece->last_movement[0], t_piece->last_movement[1]);
       printf("Cannot castle because one of the piece already moved");
       return false;
     }
@@ -462,8 +468,10 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
         return false;
       }
 
-      sp_piece->y = sp_piece->y + 2;
-      t_piece->y = sp_piece->y + 1;
+      sp_piece->y = sp_piece->y + 1;
+      t_piece->y = t_piece->y - 1;
+
+      board->current_player = (board -> current_player + 1) % 2;
 
       return true;
     } else {
@@ -748,20 +756,7 @@ void PlayChess() {
   bool initial_color_white = true;
   bool mouse_pressed = false;
 
-  Vector2 mouse_released_pos, normalized_sp;
-
-  // TODO: consider if we can just store the pice normalized position based on the logic part
-  Vector2 circles[MAX_CHESS_PIECE] = {0};
-
-  for (int i=0; i < board.current_piece_total; i++) {
-    // should be no problem not checking if the piece exist or not. 
-    circles[i].x = pieces[i].y * block_size + offset_x_mid;
-    circles[i].y = pieces[i].x * block_size + offset_y_mid;
-  }
-
-  int last_circle_p;
-  Vector2 last_circle_v;
-  bool check_point = false;
+  Vector2 mouse_clicked_pos;
 
   InitWindow(width, height, "Chess Game");
   initPieceSymbols(&piece_symbols);
@@ -787,62 +782,31 @@ void PlayChess() {
         continue;
       }
 
-      DrawTexture(piece_symbols[pieceId(pieces[i].piece_owner, pieces[i].piece_type)], circles[i].x, circles[i].y , WHITE);
+      int pos_x = offset_x_mid + pieces[i].y * block_size;
+      int pos_y = offset_y_mid + pieces[i].x * block_size;
+
+      DrawTexture(piece_symbols[pieceId(pieces[i].piece_owner, pieces[i].piece_type)], pos_x, pos_y , WHITE);
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       Vector2 mouse_pressed_pos = GetMousePosition();
+      Vector2 normalized_clicked = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_pressed_pos.x, mouse_pressed_pos.y, block_size);
 
-      Vector2 mouse_factor = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_pressed_pos.x, mouse_pressed_pos.y, block_size);
+      Piece *piece = getPiece(&board, normalized_clicked.x, normalized_clicked.y);
 
-      float x_normalized = mouse_factor.y * block_size + offset_x_mid;
-      float y_normalized = mouse_factor.x * block_size + offset_y_mid;
-
-
-      for (int i=0; i < board.current_piece_total; i++) {
-
-        if (pieces[i].taken) {
-          continue;
-        }
-
-        if (x_normalized == circles[i].x && y_normalized == circles[i].y) {
-          last_circle_p = i;
-          last_circle_v.x = x_normalized;
-          last_circle_v.y = y_normalized;
-          mouse_pressed = true;
-          normalized_sp = mouse_factor;
-          break;
-        }
-      }
-
-    }
-
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && mouse_pressed) {
-      mouse_released_pos = GetMousePosition();
-
-      Vector2 normalized_target = getNormalizedPosition(offset_x_mid, offset_y_mid, mouse_released_pos.x, mouse_released_pos.y, block_size);
-
-
-      bool piece_moved = movePiece(&board, normalized_sp.x, normalized_sp.y, normalized_target.x, normalized_target.y);
-
-      if (piece_moved) {
-        circles[last_circle_p].y = normalized_target.x * (block_size) + offset_y_mid;
-        circles[last_circle_p].x = normalized_target.y * (block_size) + offset_x_mid;
+      if (!mouse_pressed) {
+        mouse_clicked_pos = normalized_clicked;
       } else {
-        circles[last_circle_p].x = last_circle_v.x;
-        circles[last_circle_p].y = last_circle_v.y;
+        printf("%f, %f, %f, %f\n", mouse_clicked_pos.y, mouse_clicked_pos.x, normalized_clicked.y, normalized_clicked.x);
+        movePiece(&board, mouse_clicked_pos.x, mouse_clicked_pos.y, normalized_clicked.x, normalized_clicked.y);
       }
 
-      last_circle_p = -1;
-      last_circle_v.x = 0;
-      last_circle_v.y = 0;
-      mouse_pressed = false;
-    }
-
-    if (mouse_pressed) {
-      Vector2 mouse_dragged_pos = GetMousePosition();
-      circles[last_circle_p].x = mouse_dragged_pos.x - rectangle_size/2;
-      circles[last_circle_p].y = mouse_dragged_pos.y - rectangle_size/2;
+      if (piece != NULL && mouse_pressed == false) {
+        mouse_pressed = true;
+      } else {
+        mouse_pressed = false;
+      }
+      
     }
 
     EndDrawing();
