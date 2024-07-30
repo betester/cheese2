@@ -466,6 +466,9 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     return false;
   }
 
+  dx = dx == 0 ? dx : dx/dx * (dx < 0 ? - 1 : 1); 
+  dy = dy == 0 ? dy : (dy/dy) * (dy < 0 ? - 1 : 1); 
+
   bool blocked = blockedByNonTargetPiece(
     board, 
     max_diff, 
