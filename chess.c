@@ -305,14 +305,14 @@ void validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
  * Return 00 : save
 */
 
-bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y, ChessPlayer attacking_player) {
+bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y, ChessPlayer current_player) {
   PieceMovement (*movements)[TOTAL_PIECES] = board->movements;
   bool position_under_attack = false;
 
   for (int i = 0; i < board->current_piece_total;i++) {
     Piece piece = (*board->pieces)[i];
 
-    if (piece.piece_owner == attacking_player || piece.taken) {
+    if (piece.piece_owner == current_player || piece.taken) {
       continue;
     }
 
@@ -444,9 +444,29 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   
     // need to check whether two blocks is attacked by other pieces.
     if (king_side) {
+      assert(sp_piece->y + 1 < 8);
+      assert(sp_piece->y + 2 < 8);
 
+      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y + 1);
+      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y + 2);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 1, sp_piece->piece_owner);
+      bool knight_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 2, sp_piece->piece_owner);
+
+      if (bishop != NULL || knight != NULL) {
+        printf("Cannot castle because there is a piece on the way\n");
+        return false;
+      }
+
+      if (bishop_square_attacked || knight_square_attacked) {
+        printf("Cannot castle because the position was attacked \n");
+        return false;
+      }
+
+      sp_piece->y = sp_piece->y + 2;
+      t_piece->y = sp_piece->y + 1;
+
+      return true;
     } else {
-
     }
   }
 
