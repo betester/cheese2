@@ -2,6 +2,7 @@
 #include "chess.h"
 #include "raylib.h"
 #include <assert.h>
+#include <stdio.h>
 
 #define CHESS_BOARD_HEIGHT 8
 #define CHESS_BOARD_WIDTH 8
@@ -226,6 +227,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
 
 Piece *getPiece(Board *board, int x, int y) {
   for (int i = 0; i < board->current_piece_total; i++) {
+    printf("%d\n", i);
     if ((*board->pieces)[i].x == x && (*board->pieces)[i].y == y && !(*board->pieces)[i].taken) {
       return &(*board->pieces)[i];
     }
@@ -243,15 +245,13 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
 
-  printf("starting position\n");
-  printf("%d %d\n", st_x, st_y);
-
-  printf("max offset\n");
-  printf("%d\n", max_offset);
-
-  printf("\n");
-
-  printf("dx %d dy %d\n", dx, dy);
+  // printf("starting position\n");
+  // printf("%d %d\n", st_x, st_y);
+  //
+  // printf("max offset\n");
+  // printf("%d\n", max_offset);
+  //
+  // printf("dx %d dy %d\n", dx, dy);
 
   for (int i = 1; i <= max_offset; i++) {
     int x_offset = st_x + dx * i;
@@ -273,28 +273,27 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
 }
 
 
-bool validDirection(PieceMovement *movement, char dx, char dy, PieceType type, ChessPlayer player) {
-  bool valid_direction = false;
+void validDirection(PieceMovement *movement, char dx, char dy, PieceType type, ChessPlayer player, char (*valid_direction)[2]) {
+  
+  int direction = type == PAWN && player == BLACK_P ? -1 : 1;
 
-  if (type == PAWN && player == BLACK_P) {
-    dx = dx * -1;
-  }
+  dx = dx * direction;
 
   // check if direction is valid
   for (char j = 1; j <= movement->max_diff; j++) {
     for (int i = 0; i < movement->total_movement; i++) {
-      assert(i < 8);
+
       char valid_dx = movement->movements[i][0];
       char valid_dy = movement->movements[i][1];
 
       if (j * valid_dx == dx && j * valid_dy == dy) {
-        return true;
+        (*valid_direction)[0] = valid_dx * direction;
+        (*valid_direction)[1] = valid_dy;
+        break;
       }
     }
 
   }
-
-  return false;
 }
 
 /*
@@ -357,18 +356,18 @@ int getKingCondition(Board *board) {
       printf("dx_k %d dy_k %d\n", dx_k, dy_k);
     }
 
-    if (validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner)) {
+    char king_valid_direction[2] = {0};
+    validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &king_valid_direction);
 
-      dx_k = dx_k == 0 ? dx_k : dx_k/dx_k * (dx_k < 0 ? - 1 : 1); 
-      dy_k = dy_k == 0 ? dy_k : (dy_k/dy_k) * (dy_k < 0 ? - 1 : 1); 
+    if (!(king_valid_direction[0] == 0 && king_valid_direction[1] == 0))  {
 
       king_in_check = king_in_check || !blockedByNonTargetPiece(
         board, 
         piece_movement.max_diff, 
         piece.x, 
         piece.y,
-        dx_k, 
-        dy_k,
+        king_valid_direction[0], 
+        king_valid_direction[1],
         kx,
         ky
       );
@@ -460,25 +459,29 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   PieceMovement movement = (*movements)[sp_piece->piece_type];
 
   unsigned char max_diff = movement.max_diff;
+  char valid_direction[2] = {0};
 
-  if (!validDirection(&movement, dx, dy, sp_piece->piece_type, sp_piece->piece_owner)) {
+  validDirection(&movement, dx, dy, sp_piece->piece_type, sp_piece->piece_owner, &valid_direction);
+
+  if (valid_direction[0] == 0 && valid_direction[1] == 0) {
     printf("Cannot move piece to direction %d %d\n", dx, dy);
     return false;
   }
 
-  dx = dx == 0 ? dx : dx/dx * (dx < 0 ? - 1 : 1); 
-  dy = dy == 0 ? dy : (dy/dy) * (dy < 0 ? - 1 : 1); 
+  printf("valid direction x : %d y : %d\n", valid_direction[0], valid_direction[1]);
 
   bool blocked = blockedByNonTargetPiece(
     board, 
     max_diff, 
     sp_x, 
     sp_y,
-    dx, 
-    dy,
+    valid_direction[0], 
+    valid_direction[1],
     t_x,
     t_y
   );
+
+    printf("How about here\n");
 
   if (blocked) {
     printf("Cannot move to target due to blocked by other piece\n");
@@ -511,7 +514,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     if (dx == 1 * direction && (dy == 1 || dy == -1) && sp_beside_piece != NULL && sp_beside_piece->piece_owner != sp_piece->piece_owner) {
 
       if (t_piece != NULL) {
-        printf("Cannot do en passant if the target position is not empty%s\n");
+        printf("Cannot do en passant if the target position is not empty\n");
         return false;
       }
 
@@ -545,6 +548,14 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   sp_piece->x = t_x;
   sp_piece->y = t_y;
 
+  // eat the piece
+  bool previous_t_piece_state = false;
+
+  if (t_piece != NULL && !t_piece->taken) {
+    t_piece->taken = true;
+    previous_t_piece_state = t_piece->taken;
+  } 
+
   int king_condition = getKingCondition(board);
 
   printf("king condition %d\n", king_condition);
@@ -554,7 +565,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   bool checkmated = king_condition & 1; 
   printf("checkmate  %d\n", checkmated);
 
-
   board->king_in_check = king_in_check;
   board->checkmated = checkmated;
 
@@ -563,6 +573,11 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
     sp_piece->x = sp_x;
     sp_piece->y = sp_y;
+
+    if (t_piece != NULL) {
+      t_piece->taken = previous_t_piece_state;
+    }
+
     return false;
   } else if (current_king_condition & !king_in_check) {
     board->current_player = (board -> current_player + 1) % 2;
