@@ -243,18 +243,28 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
 
+  printf("starting position\n");
+  printf("%d %d\n", st_x, st_y);
+
+  printf("max offset\n");
+  printf("%d\n", max_offset);
+
+  printf("\n");
+
+  printf("dx %d dy %d\n", dx, dy);
+
   for (int i = 1; i <= max_offset; i++) {
     int x_offset = st_x + dx * i;
     int y_offset = st_y + dy * i;
 
+    printf("x_offset %d , y_offset %d\n", x_offset, y_offset);
+  
     if (x_offset == tx && y_offset == ty) {
       break;
     }
 
     Piece *piece = getPiece(board, x_offset, y_offset);
-    if (piece != NULL && !piece->taken){
-      printf("type block : %d\n", piece->piece_type);
-      printf("piece exist on x : %d y : %d\n", x_offset, y_offset);
+    if (piece != NULL && !piece->taken) {
       return true;
     }
   }
@@ -287,6 +297,119 @@ bool validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
   return false;
 }
 
+/*
+ * Returns 11 : checkmated
+ * Returns 10 : in check
+ * Return 00 : save
+*/
+int getKingCondition(Board *board) {
+  // TODO: 
+  // 1. handle when the king is in check or not for the current player 
+  // just loop and find the king, once we find it we check for every enemy piece whether it attacks the king or not.
+  // 2. handle whether the king is on checkmate or not
+  // this needs to know whether the king is on check or not. but the idea is to see every possible direction the king can go
+  // then check whether it's possible to move to certain position if it's not attacked and not occupied. checkmate happens only if 
+  // the king is on check with nowhere to go.
+
+  // finding the king position
+  // finding the king position
+
+  Piece *opponent_king;
+  PieceMovement (*movements)[TOTAL_PIECES] = board->movements; 
+
+  for (int i = 0; i < board->current_piece_total; i++) {
+    if ((*board->pieces)[i].piece_owner == board->current_player && (*board->pieces)[i].piece_type == KING) {
+      opponent_king = &(*board->pieces)[i];
+      break;
+    }
+  }
+
+  unsigned char kx = opponent_king->x;
+  unsigned char ky = opponent_king->y;
+
+  PieceMovement king_movements = (*movements)[KING];
+
+  int king_surrounding_loc[king_movements.total_movement][2];
+
+  for (int i = 0; i < king_movements.total_movement; i++) {
+    king_surrounding_loc[i][0] = kx + king_movements.movements[i][0];
+    king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
+  }
+
+  bool king_in_check = false;
+  bool checkmated = false;
+
+  for (int i = 0; i < board->current_piece_total;i++) {
+    Piece piece = (*board->pieces)[i];
+
+    if (piece.piece_owner == board->current_player || piece.taken) {
+      continue;
+    }
+
+    PieceMovement piece_movement = (*movements)[piece.piece_type];
+
+    int dx_k = kx - piece.x;
+    int dy_k = ky - piece.y;
+
+
+    if (piece.piece_type == BISHOP) {
+      printf("piece.x %d piece.y %d \n", piece.x, piece.y);
+      printf("dx_k %d dy_k %d\n", dx_k, dy_k);
+    }
+
+    if (validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner)) {
+
+      dx_k = dx_k == 0 ? dx_k : dx_k/dx_k * (dx_k < 0 ? - 1 : 1); 
+      dy_k = dy_k == 0 ? dy_k : (dy_k/dy_k) * (dy_k < 0 ? - 1 : 1); 
+
+      king_in_check = king_in_check || !blockedByNonTargetPiece(
+        board, 
+        piece_movement.max_diff, 
+        piece.x, 
+        piece.y,
+        dx_k, 
+        dy_k,
+        kx,
+        ky
+      );
+    }
+
+    unsigned char total_surrounded = 0;
+    unsigned char expected_surrounding_for_checkmate = king_movements.total_movement;
+
+  //   for (int j = 0; j < king_movements.total_movement; j++) {
+  //     if (positionOutofBound(king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
+  //       expected_surrounding_for_checkmate--;
+  //       continue;
+  //     }
+  //     int dx_ks = king_surrounding_loc[j][0] - piece.x;
+  //     int dy_ks = king_surrounding_loc[j][1] - piece.y;
+  //
+  //     bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, piece.piece_type, piece.piece_owner);
+  //
+  //     bool piece_attacked_the_surrounding = blockedByNonTargetPiece(
+  //       board, 
+  //       piece_movement.max_diff, 
+  //       piece.x, 
+  //       piece.y,
+  //       dx_ks, 
+  //       dy_ks,
+  //       king_surrounding_loc[j][0],
+  //       king_surrounding_loc[j][1]
+  //     );
+  //
+  //     if (piece_can_go_to_surrounding && piece_attacked_the_surrounding) {
+  //       total_surrounded++;
+  //     }
+  //   }
+  }
+
+  int king_condition = 0;
+  king_condition = king_condition | (king_in_check << 1) | checkmated;
+
+  return king_condition;
+}
+
 bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   if (board->promoted_pawn != NULL) {
@@ -299,8 +422,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     return false;
   }
 
-  if (board->king_in_check) {
-    printf("Cannot move piece as the king is in check\n");
+  if (board->checkmated) {
+    printf("Cannot move the piece as the king is checkmated\n");
     return false;
   }
 
@@ -308,7 +431,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     printf("Invalid position due to out of board bound\n");
     return false;
   }
-
 
   Piece *sp_piece = getPiece(board, sp_x, sp_y);
   Piece *t_piece = getPiece(board, t_x, t_y);
@@ -409,129 +531,48 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   }
 
-  // eat the piece
-  if (t_piece != NULL && !t_piece->taken) {
-    printf("type %d\n", t_piece->piece_type);
-    t_piece->taken = true;
-  } 
+  // change the current allowed player to move
+  bool current_king_condition = board->king_in_check;
 
+  if (!current_king_condition) {
+    board->current_player = (board -> current_player + 1) % 2;
+  }
 
+  // update this to make sure that it accounts for the piece that has moved as well.
   sp_piece->x = t_x;
   sp_piece->y = t_y;
+
+  int king_condition = getKingCondition(board);
+
+  printf("king condition %d\n", king_condition);
+
+  bool king_in_check = king_condition & 2; 
+  printf("king in check %d\n", king_in_check);
+  bool checkmated = king_condition & 1; 
+  printf("checkmate  %d\n", checkmated);
+
+
+  board->king_in_check = king_in_check;
+  board->checkmated = checkmated;
+
+  if (current_king_condition & king_in_check) {
+    printf("Cannot move the piece as the king is still on check\n");
+
+    sp_piece->x = sp_x;
+    sp_piece->y = sp_y;
+    return false;
+  } else if (current_king_condition & !king_in_check) {
+    board->current_player = (board -> current_player + 1) % 2;
+  }
+
   // update last taken movement
   sp_piece->last_movement[0] = dx;
   sp_piece->last_movement[1] = dy;
 
-  // change the current allowed player to move
-  board->current_player = (board -> current_player + 1) % 2;
-
-  // TODO: 
-  // 1. handle when the king is in check or not for the current player 
-  // just loop and find the king, once we find it we check for every enemy piece whether it attacks the king or not.
-  // 2. handle whether the king is on checkmate or not
-  // this needs to know whether the king is on check or not. but the idea is to see every possible direction the king can go
-  // then check whether it's possible to move to certain position if it's not attacked and not occupied. checkmate happens only if 
-  // the king is on check with nowhere to go.
-
-  // finding the king position
-  Piece *opponent_king;
-
-  for (int i = 0; i < board->current_piece_total; i++) {
-    if ((*board->pieces)[i].piece_owner == board->current_player && (*board->pieces)[i].piece_type == KING) {
-      opponent_king = &(*board->pieces)[i];
-      break;
-    }
-  }
-
-  unsigned char kx = opponent_king->x;
-  unsigned char ky = opponent_king->y;
-
-  PieceMovement king_movements = (*movements)[KING];
-
-  int king_surrounding_loc[king_movements.total_movement][2];
-
-  for (int i = 0; i < king_movements.total_movement; i++) {
-    king_surrounding_loc[i][0] = kx + king_movements.movements[i][0];
-    king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
-  }
-
-  bool king_in_check = false;
-
-  for (int i = 0; i < board->current_piece_total;i++) {
-    Piece piece = (*board->pieces)[i];
-
-    if (piece.piece_owner == board->current_player || piece.taken) {
-      continue;
-    }
-    PieceMovement piece_movement = (*movements)[piece.piece_type];
-
-    int dx_k = kx - piece.x;
-    int dy_k = ky - piece.y;
-
-    if (validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner)) {
-
-      king_in_check = king_in_check || blockedByNonTargetPiece(
-        board, 
-        piece_movement.max_diff, 
-        piece.x, 
-        piece.y,
-        dx_k, 
-        dy_k,
-        kx,
-        ky
-      );
-    }
-
-    unsigned char total_surrounded = 0;
-    unsigned char expected_surrounding_for_checkmate = king_movements.total_movement;
-
-    for (int j = 0; j < king_movements.total_movement; j++) {
-      if (positionOutofBound(king_surrounding_loc[j][0], king_surrounding_loc[j][1])) {
-        expected_surrounding_for_checkmate--;
-        continue;
-      }
-      int dx_ks = king_surrounding_loc[j][0] - piece.x;
-      int dy_ks = king_surrounding_loc[j][1] - piece.y;
-
-      bool piece_can_go_to_surrounding = validDirection(&piece_movement, dx_ks, dy_ks, piece.piece_type, piece.piece_owner);
-
-      bool piece_attacked_the_surrounding = blockedByNonTargetPiece(
-        board, 
-        max_diff, 
-        piece.x, 
-        piece.y,
-        dx_ks, 
-        dy_ks,
-        king_surrounding_loc[j][0],
-        king_surrounding_loc[j][1]
-      );
-
-      if (piece_can_go_to_surrounding && piece_attacked_the_surrounding) {
-        total_surrounded++;
-      }
-    }
-
-    if (king_in_check) {
-      board->king_in_check = true;
-    }
-
-    if (king_in_check && total_surrounded == expected_surrounding_for_checkmate) {
-      board->checkmated = true;
-    }
-  }
-
-
-  if (sp_piece->piece_type == PAWN) {
-    printf("sp_piece x : %d sp_piece y : %d\n", sp_piece->x, sp_piece->y);
-    printf("t_x : %d t_y : %d\n", t_x, t_y);
-    printf("sp_x : %d sp_y: %d\n", sp_x, sp_y);
-  }
-  
-  for (int i = 0; i < board->current_piece_total; i++) {
-    if ((*board->pieces)[i].piece_type == QUEEN)
-  
-      printf("x : %d y : %d\n", (*board->pieces)[i].x, (*board->pieces)[i].y);
-  }
+  // eat the piece
+  if (t_piece != NULL && !t_piece->taken) {
+    t_piece->taken = true;
+  } 
 
   return true;
 }
@@ -654,7 +695,6 @@ void PlayChess() {
   unsigned char taken_move[4] = {0};
 
   Board board = initBoard(&pieces, &movements);
-  printf("fuck you");
 
   int width = 800;
   int height = 600;
