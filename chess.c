@@ -1,5 +1,7 @@
 
-// TODO: there is a bug where pawn can move diagonally even though there was no piece there.
+// TODO: handle bug where pawn considered to be able to move twice distance on diagonal
+// Promote pawn
+// Checkmate
 
 #include "chess.h"
 #include "raylib.h"
@@ -450,7 +452,6 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
   
     // need to check whether two blocks is attacked by other pieces.
     if (king_side) {
-      assert(sp_piece->y + 1 < 8);
       assert(sp_piece->y + 2 < 8);
 
       Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y + 1);
@@ -475,7 +476,32 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
       return true;
     } else {
-    }
+      assert(sp_piece->y - 3 < 8);
+
+      Piece *queen = getPiece(board, sp_piece->x, sp_piece->y - 1);
+      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y - 2);
+      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y - 3);
+      
+      bool queen_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 1, sp_piece->piece_owner);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 3, sp_piece->piece_owner);
+
+      if (queen != NULL || bishop != NULL || knight != NULL) {
+        printf("Cannot castle because there is a piece on the way\n");
+        return false;
+      }
+
+      if (queen_square_attacked || bishop_square_attacked) {
+        printf("Cannot castle because the position was attacked \n");
+        return false;
+      }
+
+      sp_piece->y = sp_piece->y - 2;
+      t_piece->y = t_piece->y + 3;
+
+      board->current_player = (board -> current_player + 1) % 2;
+
+      return true;
+    } 
   }
 
   if (t_piece != NULL && t_piece->piece_owner == sp_piece->piece_owner) {
