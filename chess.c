@@ -345,7 +345,7 @@ bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y,
   return position_under_attack;
 }
 
-int getKingCondition(Board *board) {
+int getKingCondition(Board *board, ChessPlayer player) {
   // TODO: 
   // 1. handle when the king is in check or not for the current player 
   // just loop and find the king, once we find it we check for every enemy piece whether it attacks the king or not.
@@ -358,7 +358,7 @@ int getKingCondition(Board *board) {
   PieceMovement (*movements)[TOTAL_PIECES] = board->movements; 
 
   for (int i = 0; i < board->current_piece_total; i++) {
-    if ((*board->pieces)[i].piece_owner == board->current_player && (*board->pieces)[i].piece_type == KING) {
+    if ((*board->pieces)[i].piece_owner == player && (*board->pieces)[i].piece_type == KING) {
       opponent_king = &(*board->pieces)[i];
       break;
     }
@@ -376,7 +376,7 @@ int getKingCondition(Board *board) {
     king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
   }
 
-  bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, board->current_player);
+  bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, player);
   bool checkmated = false;
 
   int king_condition = 0;
@@ -523,6 +523,11 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // en passant
     // 2 or 1 step ahead on initial start
 
+    if ((dy == 1 || dy == -1) && t_piece == NULL) {
+      printf("Cannot move diagonally as there is no piece to attack\n");
+      return false;
+    }
+
     // if 2 step but already move then we cant take this step
     int direction = sp_piece->piece_owner == BLACK_P ? -1 : 1;
     if (dx == 2 * direction && !(sp_piece->last_movement[0] == 0 && sp_piece->last_movement[1] == 0)) {
@@ -566,55 +571,56 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     }
 
   } 
-  // change the current allowed player to move
-  bool current_king_condition = board->king_in_check;
-
-  if (!current_king_condition) {
-    board->current_player = (board -> current_player + 1) % 2;
-  }
-
   // update this to make sure that it accounts for the piece that has moved as well.
   sp_piece->x = t_x;
   sp_piece->y = t_y;
 
   // eat the piece
-  bool previous_t_piece_state = false;
+  bool t_piece_eaten = false;
 
   if (t_piece != NULL && !t_piece->taken) {
+    t_piece_eaten = t_piece->taken;
     t_piece->taken = true;
-    previous_t_piece_state = t_piece->taken;
   } 
 
-  int king_condition = getKingCondition(board);
+  int white_king_condition = getKingCondition(board, WHITE_P);
+  int black_king_condition = getKingCondition(board, BLACK_P);
 
-  printf("king condition %d\n", king_condition);
+  bool w_king_in_check = white_king_condition & 2; 
+  bool w_checkmated = white_king_condition & 1; 
 
-  bool king_in_check = king_condition & 2; 
-  printf("king in check %d\n", king_in_check);
-  bool checkmated = king_condition & 1; 
-  printf("checkmate  %d\n", checkmated);
+  bool b_king_in_check = black_king_condition & 2; 
+  bool b_checkmated = black_king_condition & 1; 
 
-  board->king_in_check = king_in_check;
-  board->checkmated = checkmated;
+  bool undo = false;
 
-  if (current_king_condition & king_in_check) {
+  assert(!(w_king_in_check && b_king_in_check));
+  assert(!(w_checkmated && b_checkmated));
+
+  // case where the current plyaer is getting checked by upcoming attack on the blocking piece
+  undo = ((board->current_player == BLACK_P && b_king_in_check) || (board->current_player == WHITE_P && w_king_in_check));
+  
+  board->king_in_check = w_king_in_check || b_king_in_check;
+  board->checkmated = w_checkmated || b_checkmated;
+
+  if (undo) {
     printf("Cannot move the piece as the king is still on check\n");
 
     sp_piece->x = sp_x;
     sp_piece->y = sp_y;
 
     if (t_piece != NULL) {
-      t_piece->taken = previous_t_piece_state;
+      t_piece->taken = t_piece_eaten;
     }
 
     return false;
-  } else if (current_king_condition & !king_in_check) {
-    board->current_player = (board -> current_player + 1) % 2;
-  }
+  } 
 
   // update last taken movement
   sp_piece->last_movement[0] = dx;
   sp_piece->last_movement[1] = dy;
+
+  board->current_player = (board->current_player + 1) % 2;
 
   // eat the piece
   if (t_piece != NULL && !t_piece->taken) {
