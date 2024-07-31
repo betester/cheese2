@@ -377,9 +377,7 @@ int getKingCondition(Board *board, ChessPlayer player) {
 
   PieceMovement king_movements = (*movements)[KING];
 
-
   bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, player);
-  int expected_surrounding_for_checkmate = king_movements.total_movement;
 
   bool checkmated = false;
 
@@ -388,7 +386,10 @@ int getKingCondition(Board *board, ChessPlayer player) {
   // i am assuming that total attacking piece would not be mroe than 8
   
   int total_attacking_piece = 0;
+  int king_valid_movement = king_movements.total_movement;
+
   unsigned char attacking_piece_pos[CHESS_BOARD_HEIGHT][2] = {0};
+  unsigned char attacked_king_pos[CHESS_BOARD_HEIGHT][2] = {0};
   char attack_direction[CHESS_BOARD_HEIGHT][2] = {0};
 
   for (int i = 0; i < king_movements.total_movement; i++) {
@@ -396,10 +397,18 @@ int getKingCondition(Board *board, ChessPlayer player) {
     int ky_s = ky + king_movements.movements[i][1];
 
     if (positionOutofBound(kx_s, ky_s)) {
+      king_valid_movement--;
       continue;
     }
 
-    // check if the surrounding can be attacked by other piece somehow?
+    Piece *blocking_piece = getPiece(board, kx_s, ky_s);
+
+    if (blocking_piece != NULL) {
+      king_valid_movement--;
+      continue;
+    }
+
+    // check if the surrounding can be attacked by other piece
     for (int j = 0; j < board->current_piece_total; j++) {
       Piece piece = (*board->pieces)[j];
 
@@ -417,16 +426,22 @@ int getKingCondition(Board *board, ChessPlayer player) {
         continue;
       }
 
-      bool blocked = blockedByNonTargetPiece(
-        board, 
-        (*movements)[piece.piece_type].max_diff, 
-        piece.x, 
-        piece.y,
-        valid_direction[0], 
-        valid_direction[1],
-        kx_s,
-        ky_s 
-      );
+      bool blocked = false;
+
+      for (int i = 1; i <= (*movements)[piece.piece_type].max_diff; i++) {
+        int x_offset = piece.x + dx * i;
+        int y_offset = piece.y + dy * i;
+
+        if (x_offset == kx_s && y_offset == ky_s) {
+          break;
+        }
+
+        Piece *blocking_piece = getPiece(board, x_offset, y_offset);
+        if (blocking_piece != NULL && !blocking_piece->taken && !(blocking_piece->x == kx && blocking_piece->y == ky)) {
+          blocked = true;
+          break;
+        }
+      }
 
       if (blocked) {
         continue;
@@ -440,14 +455,19 @@ int getKingCondition(Board *board, ChessPlayer player) {
       attack_direction[total_attacking_piece][1] = valid_direction[1];
       attacking_piece_pos[total_attacking_piece][0] = piece.x; 
       attacking_piece_pos[total_attacking_piece][1] = piece.y; 
+      attacked_king_pos[total_attacking_piece][0] = kx_s;
+      attacked_king_pos[total_attacking_piece][1] = ky_s;
+
       total_attacking_piece++;
+      king_valid_movement--;
 
       assert(total_attacking_piece < 8);
     }
   }
 
-  // this unironically handles the case for knight
-  bool attacked_from_all_dir = true;
+  // this ironically handles the case for knight
+  // TODO: count how many direction king could move and then see if all the position were attacked.
+  int total_covered = 0;
 
   // need to check if there is no blocking from source attacker to the king.
   ChessPlayer opponent_p = king->piece_owner == WHITE_P ? BLACK_P : WHITE_P;
@@ -457,17 +477,29 @@ int getKingCondition(Board *board, ChessPlayer player) {
 
     bool covered = false;
 
-    int dx = attacking_piece_pos[i][0] + attack_direction[i][0];
-    int dy = attacking_piece_pos[i][1] + attack_direction[i][1];
-    covered = covered || positionUnderAttackByPlayer(board,  dx, dy, opponent_p);
+    int dx = attacking_piece_pos[i][0];
+    int dy = attacking_piece_pos[i][1];
 
-    attacked_from_all_dir = attacked_from_all_dir && !covered;
+    int kx_s = attacked_king_pos[i][0];
+    int ky_s = attacked_king_pos[i][0];
 
-    if (!attacked_from_all_dir) {
-      break;
+    while (dx <= kx_s && dy <= ky_s && dx >= 0 && dy >= 0) {
+      dx += attack_direction[i][0];
+      dy += attack_direction[i][1];
+
+      covered = covered || positionUnderAttackByPlayer(board, dx, dy, opponent_p);
+    }
+    
+    if (covered) {
+      total_covered++;
     }
   }
-  checkmated = king_in_check && (attacked_from_all_dir && total_attacking_piece > 0);
+  
+  bool stalemate = total_covered < total_attacking_piece && king_valid_movement == 0;
+
+  printf("valid king movement: %d total covered %d\n", king_valid_movement, total_covered);
+
+  checkmated = king_in_check && stalemate;
 
   int king_condition = 0;
   king_condition = king_condition | (king_in_check << 1) | checkmated;
@@ -713,6 +745,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
   // case where the current plyaer is getting checked by upcoming attack on the blocking piece
   undo = ((board->current_player == BLACK_P && b_king_in_check) || (board->current_player == WHITE_P && w_king_in_check));
+
+  bool checkmate_ps = board->checkmated;
   
   board->king_in_check = w_king_in_check || b_king_in_check;
   board->checkmated = w_checkmated || b_checkmated;
@@ -727,6 +761,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       t_piece->taken = t_piece_eaten;
     }
 
+    board->checkmated = checkmate_ps;
     return false;
   } 
 
