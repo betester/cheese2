@@ -1,7 +1,7 @@
 
-// TODO: handle bug where pawn considered to be able to move twice distance on diagonal
 // Promote pawn
 // Checkmate
+// TODO: combined block and valid direction
 
 #include "chess.h"
 #include "raylib.h"
@@ -97,7 +97,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   // complete the black pieces
   Piece black_king = {
     .x = 7,
-    .y = 4,
+    .y = 3,
     .piece_owner = BLACK_P,
     .piece_type = KING,
     .taken = false,
@@ -106,7 +106,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   addPiece(&board, black_king);
   Piece black_queen = {
     .x = 7,
-    .y = 3, 
+    .y = 4, 
     .piece_owner = BLACK_P, 
     .piece_type = QUEEN,
     .taken = false
@@ -164,7 +164,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   // complete the white pieces
   Piece white_king = {
     .x = 0,
-    .y = 4,
+    .y = 3,
     .piece_owner = WHITE_P,
     .piece_type = KING,
     .taken = false,
@@ -173,7 +173,7 @@ Board initBoard(Piece (*initial_chess_pieces)[MAX_CHESS_PIECE], PieceMovement (*
   addPiece(&board, white_king);
   Piece white_queen = {
     .x = 0,
-    .y = 3,
+    .y = 4,
     .piece_owner = WHITE_P,
     .piece_type = QUEEN,
     .taken = false
@@ -330,7 +330,7 @@ bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y,
     validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &valid_direction);
 
     // special case for pawn as it should not be able to attack diagonally more than difference of 1 
-    if (piece.piece_type == PAWN && (valid_direction[1] == -1 || valid_direction[1] == 1) && dx_y > 1) {
+    if (piece.piece_type == PAWN && (valid_direction[1] == -1 || valid_direction[1] == 1) && dy_k > 1) {
       continue;
     }
 
@@ -376,15 +376,85 @@ int getKingCondition(Board *board, ChessPlayer player) {
 
   PieceMovement king_movements = (*movements)[KING];
 
-  int king_surrounding_loc[king_movements.total_movement][2];
-
-  for (int i = 0; i < king_movements.total_movement; i++) {
-    king_surrounding_loc[i][0] = kx + king_movements.movements[i][0];
-    king_surrounding_loc[i][1] = ky + king_movements.movements[i][1];
-  }
 
   bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, player);
+  int expected_surrounding_for_checkmate = king_movements.total_movement;
+
   bool checkmated = false;
+
+  int king_surrounding_loc[king_movements.total_movement][2];
+
+  // i am assuming that total attacking piece would not be mroe than 8
+  
+  int total_attacking_piece = 0;
+  unsigned char attacking_piece_pos[CHESS_BOARD_HEIGHT][2] = {0};
+  char attack_direction[CHESS_BOARD_HEIGHT][2] = {0};
+
+  for (int i = 0; i < king_movements.total_movement; i++) {
+    int kx_s = kx + king_movements.movements[i][0];
+    int ky_s = ky + king_movements.movements[i][1];
+
+    if (positionOutofBound(kx_s, ky_s)) {
+      continue;
+    }
+
+    // check if the surrounding can be attacked by other piece somehow?
+    for (int j = 0; j < board->current_piece_total; j++) {
+      Piece piece = (*board->pieces)[j];
+
+      if (piece.piece_owner == opponent_king->piece_owner || piece.taken) {
+        continue;
+      }
+      
+      char valid_direction[2] = {0};
+      validDirection(&(*movements)[piece.piece_type], kx_s, ky_s, piece.piece_type, piece.piece_owner, &valid_direction);
+
+      if (valid_direction[0] == 0 && valid_direction[1] == 0) {
+        continue;
+      }
+      bool blocked = blockedByNonTargetPiece(
+        board, 
+        (*movements)[piece.piece_type].max_diff, 
+        piece.x, 
+        piece.y,
+        valid_direction[0], 
+        valid_direction[1],
+        kx_s,
+        ky_s 
+      );
+
+      if (blocked) {
+        continue;
+      }
+      
+      attack_direction[total_attacking_piece][0] = valid_direction[0];
+      attack_direction[total_attacking_piece][1] = valid_direction[1];
+      attacking_piece_pos[total_attacking_piece][0] = piece.x; 
+      attacking_piece_pos[total_attacking_piece][1] = piece.y; 
+      total_attacking_piece++;
+
+      assert(total_attacking_piece < 8);
+    }
+  }
+
+  bool attacked_from_all_dir = true;
+
+  // need to check if there is no blocking from source attacker to the king.
+  ChessPlayer opponent_p = opponent_king->piece_owner == WHITE_P ? BLACK_P : WHITE_P;
+  
+
+  for (int i = 0; i < total_attacking_piece; i++) {
+    int dx = attacking_piece_pos[i][0] + attack_direction[i][0];
+    int dy = attacking_piece_pos[i][1] + attack_direction[i][1];
+
+    bool covered = positionUnderAttackByPlayer(board, dx, dy, opponent_p);
+    attacked_from_all_dir = attacked_from_all_dir && !covered;
+
+    if (!attacked_from_all_dir) {
+      break;
+    }
+  }
+  checkmated = king_in_check && attacked_from_all_dir;
 
   int king_condition = 0;
   king_condition = king_condition | (king_in_check << 1) | checkmated;
@@ -452,17 +522,17 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     //  king side would be that the rook has a bigger value in y coordinate
 
     //  
-    int diff = t_piece->y - sp_piece->y;
+    int diff = sp_piece->y - t_piece->y;
     bool king_side = diff > 0;
   
     // need to check whether two blocks is attacked by other pieces.
     if (king_side) {
       assert(sp_piece->y + 2 < 8);
 
-      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y + 1);
-      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y + 2);
-      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 1, sp_piece->piece_owner);
-      bool knight_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 2, sp_piece->piece_owner);
+      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y - 1);
+      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y - 2);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 1, sp_piece->piece_owner);
+      bool knight_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 2, sp_piece->piece_owner);
 
       if (bishop != NULL || knight != NULL) {
         printf("Cannot castle because there is a piece on the way\n");
@@ -474,8 +544,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
         return false;
       }
 
-      sp_piece->y = sp_piece->y + 1;
-      t_piece->y = t_piece->y - 1;
+      sp_piece->y = sp_piece->y - 1;
+      t_piece->y = t_piece->y + 1;
 
       board->current_player = (board -> current_player + 1) % 2;
 
@@ -483,12 +553,12 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     } else {
       assert(sp_piece->y - 3 < 8);
 
-      Piece *queen = getPiece(board, sp_piece->x, sp_piece->y - 1);
-      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y - 2);
-      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y - 3);
+      Piece *queen = getPiece(board, sp_piece->x, sp_piece->y + 1);
+      Piece *knight = getPiece(board, sp_piece->x, sp_piece->y + 2);
+      Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y + 3);
       
-      bool queen_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 1, sp_piece->piece_owner);
-      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 3, sp_piece->piece_owner);
+      bool queen_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 1, sp_piece->piece_owner);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 3, sp_piece->piece_owner);
 
       if (queen != NULL || bishop != NULL || knight != NULL) {
         printf("Cannot castle because there is a piece on the way\n");
@@ -500,8 +570,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
         return false;
       }
 
-      sp_piece->y = sp_piece->y - 2;
-      t_piece->y = t_piece->y + 3;
+      sp_piece->y = sp_piece->y + 2;
+      t_piece->y = t_piece->y - 3;
 
       board->current_player = (board -> current_player + 1) % 2;
 
