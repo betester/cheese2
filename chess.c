@@ -326,18 +326,23 @@ bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y,
     int dx_k = x - piece.x;
     int dy_k = y - piece.y;
 
-    char king_valid_direction[2] = {0};
-    validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &king_valid_direction);
+    char valid_direction[2] = {0};
+    validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &valid_direction);
 
-    if (!(king_valid_direction[0] == 0 && king_valid_direction[1] == 0))  {
+    // special case for pawn as it should not be able to attack diagonally more than difference of 1 
+    if (piece.piece_type == PAWN && (valid_direction[1] == -1 || valid_direction[1] == 1) && dx_y > 1) {
+      continue;
+    }
+
+    if (!(valid_direction[0] == 0 && valid_direction[1] == 0))  {
 
       position_under_attack = position_under_attack || !blockedByNonTargetPiece(
         board, 
         piece_movement.max_diff, 
         piece.x, 
         piece.y,
-        king_valid_direction[0], 
-        king_valid_direction[1],
+        valid_direction[0], 
+        valid_direction[1],
         x,
         y 
       );
