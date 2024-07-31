@@ -1,7 +1,8 @@
 
-// Promote pawn
-// Checkmate
-// TODO: combined block and valid direction
+// Promote pawn 
+// Checkmate (DONE)
+// TODO: combined block and valid direction (DONE)
+// there is a bug where somehow the king considered in check from a pawn, prolly need to check that.
 
 #include "chess.h"
 #include "raylib.h"
@@ -361,18 +362,18 @@ int getKingCondition(Board *board, ChessPlayer player) {
   // then check whether it's possible to move to certain position if it's not attacked and not occupied. checkmate happens only if 
   // the king is on check with nowhere to go.
 
-  Piece *opponent_king;
+  Piece *king;
   PieceMovement (*movements)[TOTAL_PIECES] = board->movements; 
 
   for (int i = 0; i < board->current_piece_total; i++) {
     if ((*board->pieces)[i].piece_owner == player && (*board->pieces)[i].piece_type == KING) {
-      opponent_king = &(*board->pieces)[i];
+      king = &(*board->pieces)[i];
       break;
     }
   }
 
-  unsigned char kx = opponent_king->x;
-  unsigned char ky = opponent_king->y;
+  unsigned char kx = king->x;
+  unsigned char ky = king->y;
 
   PieceMovement king_movements = (*movements)[KING];
 
@@ -402,16 +403,20 @@ int getKingCondition(Board *board, ChessPlayer player) {
     for (int j = 0; j < board->current_piece_total; j++) {
       Piece piece = (*board->pieces)[j];
 
-      if (piece.piece_owner == opponent_king->piece_owner || piece.taken) {
+      if (piece.piece_owner == king->piece_owner || piece.taken) {
         continue;
       }
+
+      int dx = kx_s - piece.x;
+      int dy = ky_s - piece.y;
       
       char valid_direction[2] = {0};
-      validDirection(&(*movements)[piece.piece_type], kx_s, ky_s, piece.piece_type, piece.piece_owner, &valid_direction);
+      validDirection(&(*movements)[piece.piece_type], dx, dy, piece.piece_type, piece.piece_owner, &valid_direction);
 
       if (valid_direction[0] == 0 && valid_direction[1] == 0) {
         continue;
       }
+
       bool blocked = blockedByNonTargetPiece(
         board, 
         (*movements)[piece.piece_type].max_diff, 
@@ -426,6 +431,10 @@ int getKingCondition(Board *board, ChessPlayer player) {
       if (blocked) {
         continue;
       }
+
+      if (!blocked) {
+        printf("attacking piece pos : %d %d\nblocked pos %d %d\nvalid direction %d %d\n", piece.x, piece.y, kx_s, ky_s, valid_direction[0], valid_direction[1]);
+      }
       
       attack_direction[total_attacking_piece][0] = valid_direction[0];
       attack_direction[total_attacking_piece][1] = valid_direction[1];
@@ -437,24 +446,28 @@ int getKingCondition(Board *board, ChessPlayer player) {
     }
   }
 
+  // this unironically handles the case for knight
   bool attacked_from_all_dir = true;
 
   // need to check if there is no blocking from source attacker to the king.
-  ChessPlayer opponent_p = opponent_king->piece_owner == WHITE_P ? BLACK_P : WHITE_P;
+  ChessPlayer opponent_p = king->piece_owner == WHITE_P ? BLACK_P : WHITE_P;
   
 
   for (int i = 0; i < total_attacking_piece; i++) {
+
+    bool covered = false;
+
     int dx = attacking_piece_pos[i][0] + attack_direction[i][0];
     int dy = attacking_piece_pos[i][1] + attack_direction[i][1];
+    covered = covered || positionUnderAttackByPlayer(board,  dx, dy, opponent_p);
 
-    bool covered = positionUnderAttackByPlayer(board, dx, dy, opponent_p);
     attacked_from_all_dir = attacked_from_all_dir && !covered;
 
     if (!attacked_from_all_dir) {
       break;
     }
   }
-  checkmated = king_in_check && attacked_from_all_dir;
+  checkmated = king_in_check && (attacked_from_all_dir && total_attacking_piece > 0);
 
   int king_condition = 0;
   king_condition = king_condition | (king_in_check << 1) | checkmated;
@@ -873,7 +886,16 @@ void PlayChess() {
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
+    if (board.checkmated) {
+
+      ChessPlayer player_won = board.current_player == WHITE_P ? BLACK_P : WHITE_P;
+      char *format_player = player_won == WHITE_P ? "White" : "Black";
+
+      DrawText(TextFormat("%s Won", format_player), offset_x_mid, offset_y_mid - 40, 40, BLACK);
+    } 
+
     // drawing the tiles
+
     for (int y = 0; y < CHESS_BOARD_HEIGHT; y++) {
       bool current_tile_black = !initial_color_white;
       for (int x = 0; x < CHESS_BOARD_WIDTH; x++) {
@@ -913,8 +935,8 @@ void PlayChess() {
       } else {
         mouse_pressed = false;
       }
-      
-    }
+
+      }
 
     EndDrawing();
   }
