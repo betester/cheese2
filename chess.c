@@ -2,7 +2,11 @@
 // Promote pawn 
 // Checkmate (DONE)
 // TODO: combined block and valid direction (DONE)
-// there is a bug where somehow the king considered in check from a pawn, prolly need to check that.
+// there is a bug where somehow the king considered in check from a pawn, prolly need to check that. (DONE)
+// there is a bug where diagonal attack considered to be able to block the queen from attacking the position. (DONE)
+// bug where the king considered to cover a position (DONE) 
+// when a pawn blocks attack from pawn it doesn't considered to be blocked or maybe i didnt see there was a knight somewhere
+// assertion not working for max amount of attack direction ?
 
 #include "chess.h"
 #include "raylib.h"
@@ -254,13 +258,13 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
   // check if pawn can go to the direction if there is no other pawn blocking the way
   // except the target not so efficient because we checked every possible direction
 
-  // printf("starting position\n");
-  // printf("%d %d\n", st_x, st_y);
-  //
-  // printf("max offset\n");
-  // printf("%d\n", max_offset);
-  //
-  // printf("dx %d dy %d\n", dx, dy);
+  printf("starting position\n");
+  printf("%d %d\n", st_x, st_y);
+
+  printf("max offset\n");
+  printf("%d\n", max_offset);
+
+  printf("dx %d dy %d\n", dx, dy);
 
   for (int i = 1; i <= max_offset; i++) {
     int x_offset = st_x + dx * i;
@@ -273,6 +277,7 @@ bool blockedByNonTargetPiece(Board *board, int max_offset, int st_x, int st_y, i
     }
 
     Piece *piece = getPiece(board, x_offset, y_offset);
+
     if (piece != NULL && !piece->taken) {
       return true;
     }
@@ -311,7 +316,10 @@ void validDirection(PieceMovement *movement, char dx, char dy, PieceType type, C
  * Return 00 : save
 */
 
-bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y, ChessPlayer current_player) {
+bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y, ChessPlayer current_player, PieceType skip_type[TOTAL_PIECES], int total_skipped) {
+
+  assert(total_skipped < TOTAL_PIECES);
+
   PieceMovement (*movements)[TOTAL_PIECES] = board->movements;
   bool position_under_attack = false;
 
@@ -319,6 +327,17 @@ bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y,
     Piece piece = (*board->pieces)[i];
 
     if (piece.piece_owner == current_player || piece.taken) {
+      continue;
+    }
+
+    bool should_continue = false;
+    for (int k = 0; k < total_skipped; k++) {
+      if (piece.piece_type == skip_type[k]) {
+        should_continue = true;
+      }
+    }
+
+    if (should_continue) {
       continue;
     }
 
@@ -331,23 +350,26 @@ bool positionUnderAttackByPlayer(Board *board, unsigned char x, unsigned char y,
     validDirection(&piece_movement, dx_k, dy_k, piece.piece_type, piece.piece_owner, &valid_direction);
 
     // special case for pawn as it should not be able to attack diagonally more than difference of 1 
-    if (piece.piece_type == PAWN && (valid_direction[1] == -1 || valid_direction[1] == 1) && dy_k > 1) {
+    if (valid_direction[0] == 0 && valid_direction[1] == 0) {
+      continue;
+    }
+    if (piece.piece_type == PAWN && valid_direction[1] != 0 && valid_direction[0] != 0 && dy_k > 1)  {
+      continue;
+    } else if (piece.piece_type == PAWN && valid_direction[0] != 0 && valid_direction[1] == 0) {
       continue;
     }
 
-    if (!(valid_direction[0] == 0 && valid_direction[1] == 0))  {
-
-      position_under_attack = position_under_attack || !blockedByNonTargetPiece(
-        board, 
-        piece_movement.max_diff, 
-        piece.x, 
-        piece.y,
-        valid_direction[0], 
-        valid_direction[1],
-        x,
-        y 
-      );
-    }
+    position_under_attack = position_under_attack || !blockedByNonTargetPiece(
+      board, 
+      piece_movement.max_diff, 
+      piece.x, 
+      piece.y,
+      valid_direction[0], 
+      valid_direction[1],
+      x,
+      y 
+    );
+    
   }
 
   return position_under_attack;
@@ -376,8 +398,9 @@ int getKingCondition(Board *board, ChessPlayer player) {
   unsigned char ky = king->y;
 
   PieceMovement king_movements = (*movements)[KING];
+  PieceType default_skip_type[TOTAL_PIECES] = {NEUTRAL};
 
-  bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, player);
+  bool king_in_check = positionUnderAttackByPlayer(board, kx, ky, player, default_skip_type, 1);
 
   bool checkmated = false;
 
@@ -388,9 +411,9 @@ int getKingCondition(Board *board, ChessPlayer player) {
   int total_attacking_piece = 0;
   int king_valid_movement = king_movements.total_movement;
 
-  unsigned char attacking_piece_pos[CHESS_BOARD_HEIGHT][2] = {0};
-  unsigned char attacked_king_pos[CHESS_BOARD_HEIGHT][2] = {0};
-  char attack_direction[CHESS_BOARD_HEIGHT][2] = {0};
+  unsigned char attacking_piece_pos[20][2] = {0};
+  unsigned char attacked_king_pos[20][2] = {0};
+  char attack_direction[20][2] = {0};
 
   for (int i = 0; i < king_movements.total_movement; i++) {
     int kx_s = kx + king_movements.movements[i][0];
@@ -412,7 +435,7 @@ int getKingCondition(Board *board, ChessPlayer player) {
     for (int j = 0; j < board->current_piece_total; j++) {
       Piece piece = (*board->pieces)[j];
 
-      if (piece.piece_owner == king->piece_owner || piece.taken) {
+      if (piece.piece_owner == king->piece_owner || piece.taken || (piece.x == kx_s && piece.y == ky_s)) {
         continue;
       }
 
@@ -429,14 +452,31 @@ int getKingCondition(Board *board, ChessPlayer player) {
       bool blocked = false;
 
       for (int i = 1; i <= (*movements)[piece.piece_type].max_diff; i++) {
-        int x_offset = piece.x + dx * i;
-        int y_offset = piece.y + dy * i;
+
+        if (piece.piece_type == PAWN && (valid_direction[0] == 1 || valid_direction[1] == -1)) {
+          break;
+        }
+
+        // special case for pawn as it should not be able to attack diagonally more than difference of 1 
+        if (piece.piece_type == PAWN && valid_direction[1] != 0 && valid_direction[0] != 0 && i > 1) {
+          break;
+        } else if (piece.piece_type == PAWN && valid_direction[0] != 0 && valid_direction[1] == 0) {
+          break;
+        }
+
+        int x_offset = piece.x + valid_direction[0] * i;
+        int y_offset = piece.y + valid_direction[1] * i;
 
         if (x_offset == kx_s && y_offset == ky_s) {
           break;
         }
 
         Piece *blocking_piece = getPiece(board, x_offset, y_offset);
+  
+        if (blocking_piece != NULL) {
+          printf("blocking piece is not king %d\n", !(blocking_piece->x == kx && blocking_piece->y == ky));
+        }
+
         if (blocking_piece != NULL && !blocking_piece->taken && !(blocking_piece->x == kx && blocking_piece->y == ky)) {
           blocked = true;
           break;
@@ -458,10 +498,9 @@ int getKingCondition(Board *board, ChessPlayer player) {
       attacked_king_pos[total_attacking_piece][0] = kx_s;
       attacked_king_pos[total_attacking_piece][1] = ky_s;
 
+      //TODO: handle multiple pieces could attack the same spot
       total_attacking_piece++;
       king_valid_movement--;
-
-      assert(total_attacking_piece < 8);
     }
   }
 
@@ -471,7 +510,7 @@ int getKingCondition(Board *board, ChessPlayer player) {
 
   // need to check if there is no blocking from source attacker to the king.
   ChessPlayer opponent_p = king->piece_owner == WHITE_P ? BLACK_P : WHITE_P;
-  
+  PieceType skip_type[TOTAL_PIECES] = {PAWN, KING};
 
   for (int i = 0; i < total_attacking_piece; i++) {
 
@@ -481,23 +520,34 @@ int getKingCondition(Board *board, ChessPlayer player) {
     int dy = attacking_piece_pos[i][1];
 
     int kx_s = attacked_king_pos[i][0];
-    int ky_s = attacked_king_pos[i][0];
+    int ky_s = attacked_king_pos[i][1];
 
-    while (dx <= kx_s && dy <= ky_s && dx >= 0 && dy >= 0) {
+    assert(!(kx_s == kx && ky_s == ky));
+    assert(!(dx == kx_s && dy == ky_s));
+
+    covered = covered || positionUnderAttackByPlayer(board, kx_s, ky_s, opponent_p, skip_type, 2);
+
+    printf("Current attacking offset kx_s %d ky_s %d \n", kx_s, ky_s);
+
+    while ((dx != kx_s && dy != ky_s) && !covered) {
+      printf("Current attacking offset dx %d dy %d \n", dx, dy);
+      covered = covered || positionUnderAttackByPlayer(board, dx, dy, opponent_p, skip_type, 2);
+
       dx += attack_direction[i][0];
       dy += attack_direction[i][1];
-
-      covered = covered || positionUnderAttackByPlayer(board, dx, dy, opponent_p);
     }
     
     if (covered) {
+      printf("Covered position dx : %d dy : %d\n", dx , dy);
       total_covered++;
     }
   }
   
   bool stalemate = total_covered < total_attacking_piece && king_valid_movement == 0;
 
-  printf("valid king movement: %d total covered %d\n", king_valid_movement, total_covered);
+  char *format_player = king->piece_owner == WHITE_P ? "White" : "Black";
+  printf("%s \n", format_player);
+  printf("valid king movement: %d total covered %d total_attacking_piece %d\n", king_valid_movement, total_covered, total_attacking_piece);
 
   checkmated = king_in_check && stalemate;
 
@@ -569,6 +619,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     //  
     int diff = sp_piece->y - t_piece->y;
     bool king_side = diff > 0;
+    PieceType skip_type[TOTAL_PIECES] = {NEUTRAL};
   
     // need to check whether two blocks is attacked by other pieces.
     if (king_side) {
@@ -576,8 +627,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
 
       Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y - 1);
       Piece *knight = getPiece(board, sp_piece->x, sp_piece->y - 2);
-      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 1, sp_piece->piece_owner);
-      bool knight_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 2, sp_piece->piece_owner);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 1, sp_piece->piece_owner, skip_type, 1);
+      bool knight_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y - 2, sp_piece->piece_owner, skip_type, 1);
 
       if (bishop != NULL || knight != NULL) {
         printf("Cannot castle because there is a piece on the way\n");
@@ -602,8 +653,8 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       Piece *knight = getPiece(board, sp_piece->x, sp_piece->y + 2);
       Piece *bishop = getPiece(board, sp_piece->x, sp_piece->y + 3);
       
-      bool queen_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 1, sp_piece->piece_owner);
-      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 3, sp_piece->piece_owner);
+      bool queen_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 1, sp_piece->piece_owner, skip_type, 1);
+      bool bishop_square_attacked = positionUnderAttackByPlayer(board, sp_piece->x, sp_piece->y + 3, sp_piece->piece_owner, skip_type, 1);
 
       if (queen != NULL || bishop != NULL || knight != NULL) {
         printf("Cannot castle because there is a piece on the way\n");
@@ -668,6 +719,11 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
     // could either move it 2 steps or 1 step depending whether it has already taken step previously
     // en passant
     // 2 or 1 step ahead on initial start
+
+    if ((dx == 2 || dx == -2) && t_piece != NULL) {
+      printf("Cannot move two steps as the target piece is not empty\n");
+      return false;
+    }
 
     if ((dy == 1 || dy == -1) && t_piece == NULL) {
       printf("Cannot move diagonally as there is no piece to attack\n");
@@ -761,6 +817,7 @@ bool movePiece(Board *board, int sp_x, int sp_y, int t_x, int t_y) {
       t_piece->taken = t_piece_eaten;
     }
 
+    // checkmate should only happen when a piece attacks the king and the king has nowhere to go. not when it's attacked under checkmate condition
     board->checkmated = checkmate_ps;
     return false;
   } 
@@ -961,7 +1018,6 @@ void PlayChess() {
       if (!mouse_pressed) {
         mouse_clicked_pos = normalized_clicked;
       } else {
-        printf("%f, %f, %f, %f\n", mouse_clicked_pos.y, mouse_clicked_pos.x, normalized_clicked.y, normalized_clicked.x);
         movePiece(&board, mouse_clicked_pos.x, mouse_clicked_pos.y, normalized_clicked.x, normalized_clicked.y);
       }
 
